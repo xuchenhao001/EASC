@@ -5,6 +5,7 @@ import asyncio
 
 import matplotlib
 import json
+from random import randrange
 
 matplotlib.use('Agg')
 import copy
@@ -24,12 +25,13 @@ from tornado import gen, httpclient, ioloop, web
 
 url = "http://localhost:3000/invoke/mychannel/fabcar"
 # url = "http://localhost:3000/test/echo"
-total_epochs = 10
+total_epochs = 0
 args = None
 net_glob = None
 dataset_train = None
 dataset_test = None
 dict_users = None
+idxs_users = None
 
 
 def test(data):
@@ -62,9 +64,12 @@ async def prepare():
     global dataset_train
     global dataset_test
     global dict_users
+    global idxs_users
+    global total_epochs
     # parse args
     args = args_parser()
     args.device = torch.device('cpu')
+    total_epochs = args.epochs
 
     # load dataset and split users
     if args.dataset == 'mnist':
@@ -73,21 +78,28 @@ async def prepare():
         dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
         # sample users
         if args.iid:
-            dict_users = mnist_iid(dataset_train, 1)
+            # dict_users = mnist_iid(dataset_train, 1)
+            dict_users = mnist_iid(dataset_train, args.num_users)
         else:
-            dict_users = mnist_noniid(dataset_train, 1)
+            # dict_users = mnist_noniid(dataset_train, 1)
+            dict_users = mnist_noniid(dataset_train, args.num_users)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
         dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
         if args.iid:
-            dict_users = cifar_iid(dataset_train, 1)
+            # dict_users = cifar_iid(dataset_train, 1)
+            dict_users = cifar_iid(dataset_train, args.num_users)
         else:
             exit('Error: only consider IID setting in CIFAR10')
     else:
         exit('Error: unrecognized dataset')
     img_size = dataset_train[0][0].shape
+
+    m = max(int(args.frac * args.num_users), 1)
+    idxs_users = np.random.choice(range(args.num_users), m, replace=False)
+
     # build model, init part
     if args.model == 'cnn' and args.dataset == 'cifar':
         net_glob = CNNCifar(args=args).to(args.device)
@@ -106,7 +118,7 @@ async def prepare():
     w_glob = net_glob.state_dict() # change model to parameters
     # upload w_glob onto blockchian
     convert_tensor_value_to_numpy(w_glob)
-    print("##### Epoch #", total_epochs, " start now. #####")
+    print("\n\n##### Epoch #", total_epochs, " start now. #####\n")
     body_data = {
         'message': 'prepare',
         'data': {
@@ -126,8 +138,9 @@ async def train(data, uuid, epochs):
     w_glob = data.get("w_glob")
     conver_json_value_to_tensor(w_glob)
     net_glob.load_state_dict(w_glob)
-    # local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
-    local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[0])
+    # local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[0])
+    idx = idxs_users[randrange(int(args.frac * args.num_users))]  # random select one for each round
+    local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
     convert_tensor_value_to_numpy(w)
     body_data = {
