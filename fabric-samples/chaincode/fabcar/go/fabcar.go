@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -216,7 +217,7 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 // sub-functions for STEP#6: find out the max acc_test average
 func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
 	fmt.Println("[Find Alpha] According to max acc_test average policy")
-	accTestSum :=make([]float64,negotiateRound)
+	accTestSum :=make([]float64, negotiateRound)
 	var randomUuid string
 	// calculate sum acc_test for all users into array `accTestSum`
 	for id, accAlpha := range accAlphaMap {
@@ -240,10 +241,38 @@ func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
 }
 
 // sub-functions for STEP#6: find out the min acc_test variance
-func findMinAccVar(accAlphaMap map[string]AccAlpha) error {
+func findMinAccVar(accAlphaMap map[string]AccAlpha) float64 {
 	fmt.Println("[Find Alpha] According to min acc_test variance policy")
-	// TODO
-	return nil
+	accTestAvg :=make([]float64, negotiateRound)
+	var randomUuid string
+	// calculate sum acc_test for all users into array `accTestSum`
+	for id, accAlpha := range accAlphaMap {
+		for k, accTest := range accAlpha.AccTest {
+			accTestAvg[k] += accTest / float64(userNum)
+		}
+		randomUuid = id
+	}
+	accTestVar :=make([]float64, negotiateRound)
+	// calculate the variance value of acc_test
+	for k, accAvg := range accTestAvg {
+		nVariance := 0.0
+		for _, accAlpha := range accAlphaMap {
+			nVariance += math.Pow(accAlpha.AccTest[k] - accAvg, 2)
+		}
+		accTestVar[k] = nVariance / float64(userNum)
+	}
+	// find out the min variance value in accTestVar
+	var min float64
+	var minIndex = 0
+	for i, v := range accTestVar {
+		if i==0 || v < min {
+			min = v
+			minIndex = i
+		}
+	}
+	alpha := accAlphaMap[randomUuid].Alpha[minIndex]
+	fmt.Println("Found the min acc_test variance: ", min, " with alpha: ", alpha)
+	return alpha
 }
 
 func sendPostRequest(buf []byte, requestType string) {
