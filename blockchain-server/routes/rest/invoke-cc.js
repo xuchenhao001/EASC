@@ -14,11 +14,13 @@ const path = require('path');
 
 let common = require('./common');
 
+const networkScale = 'network-4-peers'
+
 let enrollAdmin = async function() {
   logger.debug("Enroll admin...");
   try {
     // load the network configuration
-    const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
+    const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', networkScale, 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
     const fileExists = fs.existsSync(ccpPath);
     if (!fileExists) {
       throw new Error(`no such file or directory: ${ccpPath}`);
@@ -64,7 +66,7 @@ let enrollAdmin = async function() {
 let enrollAppUser = async function() {
   try {
     // load the network configuration
-    const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
+    const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', networkScale, 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
     const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
 
     // Create a new CA client for interacting with the CA.
@@ -179,7 +181,7 @@ let invoke = async function(res, channelName, chaincodeName, invokeFuncName, arg
 
 let submitRequest = async function (channelName, chaincodeName, invokeFuncName, args) {
   // load the network configuration
-  const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
+  const ccpPath = path.resolve(__dirname, '..', '..', '..', 'fabric-samples', networkScale, 'organizations', 'peerOrganizations', 'org1.example.com', 'connection-org1.json');
   const fileExists = fs.existsSync(ccpPath);
   if (!fileExists) {
     throw new Error(`no such file or directory: ${ccpPath}`);

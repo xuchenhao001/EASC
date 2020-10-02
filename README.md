@@ -67,12 +67,21 @@ http://localhost:7984/_utils
 
 ### Blockchain rest server
 
-After you started a blockchain network, start a blockchain rest server for communicate with blockchain network.
+After you started a blockchain network, modify the network scale for rest server.
+
+```bash
+vim routes/rest/invoke-cc.js
+```
+
+> Modify constant variable `networkScale` to `network-2-peers` or `network-4-peers`.
+
+
+Start a blockchain rest server for communicate with blockchain network.
 
 ```bash
 cd blockchain-server/
 rm -rf routes/rest/wallet/
-node bin/www
+npm start
 ```
 
 ### Federated Learning

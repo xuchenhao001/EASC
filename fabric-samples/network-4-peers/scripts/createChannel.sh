@@ -131,7 +131,7 @@ createAncorPeerTx Org2MSP
 createAncorPeerTx Org3MSP
 createAncorPeerTx Org4MSP
 
-FABRIC_CFG_PATH=$PWD/../config/
+# FABRIC_CFG_PATH=$PWD/../config/
 
 ## Create channel
 echo "Creating channel "$CHANNEL_NAME
