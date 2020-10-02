@@ -90,7 +90,7 @@ function checkPrereqs() {
   ## Check if your have cloned the peer binaries and configuration files.
   peer version > /dev/null 2>&1
 
-  if [[ $? -ne 0 || ! -d "../config" ]]; then
+  if [[ $? -ne 0 ]]; then
     echo "ERROR! Peer binary and configuration files not found.."
     echo
     echo "Follow the instructions in the Fabric docs to install the Fabric Binaries:"

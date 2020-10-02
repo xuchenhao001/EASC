@@ -14,7 +14,7 @@ const path = require('path');
 
 let common = require('./common');
 
-const networkScale = 'network-4-peers'
+const networkScale = 'network-2-peers'
 
 let enrollAdmin = async function() {
   logger.debug("Enroll admin...");
