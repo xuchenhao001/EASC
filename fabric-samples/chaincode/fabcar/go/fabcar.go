@@ -27,6 +27,7 @@ type HttpMessage struct {
 	Data interface{} `json:"data"`
 	Uuid string `json:"uuid"`
 	Epochs int `json:"epochs"`
+	StartTime float64 `json:"start_time"`
 }
 
 type HttpAccAlphaMessage struct {
@@ -34,6 +35,7 @@ type HttpAccAlphaMessage struct {
 	Data AccAlpha `json:"data"`
 	Uuid string `json:"uuid"`
 	Epochs int `json:"epochs"`
+	StartTime float64 `json:"start_time"`
 }
 
 type AccAlpha struct {
@@ -114,6 +116,7 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 		sendMsg.Data = wMap // send back a w map, the keys are uuids of users
 		sendMsg.Uuid = myuuid
 		sendMsg.Epochs = recMsg.Epochs
+		sendMsg.StartTime = recMsg.StartTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 
 		go sendPostRequest(sendMsgAsBytes, "TRAIN")
@@ -207,6 +210,7 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 		sendMsg.Data = data
 		sendMsg.Uuid = myuuid
 		sendMsg.Epochs = recMsg.Epochs
+		sendMsg.StartTime = recMsg.StartTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 
 		go sendPostRequest(sendMsgAsBytes, "NEGOTIATE")

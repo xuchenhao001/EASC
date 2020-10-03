@@ -3,8 +3,9 @@
 # Python version: 3.6
 import asyncio
 
-import matplotlib
 import json
+import matplotlib
+import time
 from random import randrange
 
 matplotlib.use('Agg')
@@ -124,6 +125,7 @@ async def prepare():
         'data': {
             'w_glob': w_glob,
         },
+        'start_time': time.time(),
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -133,7 +135,7 @@ async def prepare():
 
 # STEP #3
 # Federated Learning: train step
-async def train(data, uuid, epochs):
+async def train(data, uuid, epochs, start_time):
     print('train data now for uuid: ' + uuid)
     w_glob = data.get("w_glob")
     conver_json_value_to_tensor(w_glob)
@@ -150,6 +152,7 @@ async def train(data, uuid, epochs):
         },
         'uuid': uuid,
         'epochs': epochs,
+        'start_time': start_time,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'train')
@@ -158,7 +161,7 @@ async def train(data, uuid, epochs):
 
 # STEP #4
 # Federated Learning: average w for w_glob
-async def average(w_map, uuid, epochs):
+async def average(w_map, uuid, epochs, start_time):
     print('received average request.')
     wArray = []
     for i in w_map.keys():
@@ -177,34 +180,36 @@ async def average(w_map, uuid, epochs):
         },
         'uuid': uuid,
         'epochs': epochs,
+        'start_time': start_time,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'w_glob')
     print(response)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, start_time)
     thread_negotiate.start()
 
 
 # STEP #5
 # Federated Learning: negotiate and test accuracy, upload to blockchain
 class myNegotiateThread(Thread):
-    def __init__(self, my_uuid, w_glob, w_local, epochs):
+    def __init__(self, my_uuid, w_glob, w_local, epochs, start_time):
         Thread.__init__(self)
         self.my_uuid = my_uuid
         self.w_glob = w_glob
         self.w_local = w_local
         self.epochs = epochs
+        self.start_time = start_time
 
     def run(self):
         print("start my negotiate thread: " + self.my_uuid)
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs))
+        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.start_time))
         # negotiate(self.my_uuid, self.w_glob, self.w_local)
         print("end my negotiate thread: " + self.my_uuid)
 
 
-async def negotiate(my_uuid, w_glob, w_local, epochs):
+async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
     print("start negotiate for user: " + my_uuid)
     hyperpara_min = 0.5
     hyperpara_max = 0.8
@@ -237,6 +242,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         },
         'uuid': my_uuid,
         'epochs': epochs,
+        'start_time': start_time,
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -246,7 +252,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
 
 # STEP #7
 # Federated Learning: with new alpha, train w_local2, restart the round
-async def next_round(data, uuid, epochs):
+async def next_round(data, uuid, epochs, start_time):
     print('received alpha, train new w_glob for uuid: ' + uuid)
     alpha = data.get("alpha")
     w_map = data.get("wMap")
@@ -268,9 +274,13 @@ async def next_round(data, uuid, epochs):
     }
     # epochs count backwards until 0
     new_epochs = epochs - 1
+    # before start next round, record the time
+    with open("time-record_" + uuid + ".txt", "a") as time_record_file:
+        time_record_file.write("[" + f"{epochs:0>2}" + "] " + str(time.time() - start_time) + "\n")
     if new_epochs > 0:
         print("##### Epoch #", new_epochs, " start now. #####")
-        await train(data, uuid, new_epochs)
+        # reset a new time for next round
+        await train(data, uuid, new_epochs, time.time())
     else:
         print("##########\nALL DONE!\n##########")
 
@@ -315,11 +325,11 @@ class MainHandler(web.RequestHandler):
         if message == "test":
             test(data.get("data"))
         elif message == "prepare":
-            await train(data.get("data"), data.get("uuid"), data.get("epochs"))
+            await train(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
         elif message == "average":
-            await average(data.get("data"), data.get("uuid"), data.get("epochs"))
+            await average(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
         elif message == "alpha":
-            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"))
+            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
 
 
 def make_app():
