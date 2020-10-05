@@ -16,6 +16,8 @@ Docker 19.03.12 (docker-compose 1.26.2)
 
 Node.js v12.18.3 (npm 6.14.6)
 
+Golang v1.15.2
+
 ### Blockchain
 
 All blockchain scripts are under `fabric-samples` directory.
@@ -36,7 +38,7 @@ npm install
 ### Federated Learning
 
 ```bash
-pip3 install matplotlib numpy torch torchvision tornado
+pip3 install matplotlib numpy torch torchvision tornado sklearn
 ```
 
 
