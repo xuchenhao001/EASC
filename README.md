@@ -67,6 +67,15 @@ http://localhost:5984/_utils
 http://localhost:7984/_utils
 ```
 
+To export all of the data in couch db:
+
+```bash
+# check all db names
+curl -X GET http://127.0.0.1:5984/_all_dbs
+# export data in database mychannel_fabcar to ./couchdb.json
+curl -X GET http://127.0.0.1:5984/mychannel_fabcar/_all_docs\?include_docs\=true > ./couchdb.json
+```
+
 ### Blockchain rest server
 
 After you started a blockchain network, modify the network scale for rest server.
