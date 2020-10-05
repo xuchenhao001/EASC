@@ -159,7 +159,7 @@ router.post('/test/echo', async function (req, res) {
 });
 
 let invoke = async function(res, channelName, chaincodeName, invokeFuncName, args) {
-  let maxTries = 3;
+  let maxTries = 30;
   let errMessage;
   while (maxTries>0) {
     try {
