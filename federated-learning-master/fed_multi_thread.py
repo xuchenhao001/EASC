@@ -139,6 +139,7 @@ class MultiTrainThread(Thread):
 # Federated Learning: train step
 async def train(uuid, w_glob, epochs, start_time):
     global w_map
+    global net_glob
     print('train data now for uuid: ' + uuid)
     conver_json_value_to_tensor(w_glob)
     net_glob.load_state_dict(w_glob)
@@ -197,6 +198,7 @@ async def average(w_map, uuid, epochs, start_time):
 async def negotiate(uuid, w_glob, w_glob_map, w_local, epochs, start_time):
     global acc_alpha_map
     global negotiate_round
+    global net_glob
     print("start negotiate for user: " + uuid)
     hyperpara_min = 0.5
     hyperpara_max = 0.8
@@ -212,7 +214,9 @@ async def negotiate(uuid, w_glob, w_glob_map, w_local, epochs, start_time):
             w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
 
         # change parameters to model
+        # net_glob.load_state_dict(w_local2)
         net_glob.load_state_dict(w_local2)
+        net_glob = net_glob.to(args.device)
         net_glob.eval()
         # test the accuracy
         acc_test, loss_test = test_img(net_glob, dataset_test, args)
@@ -295,7 +299,7 @@ def conver_json_value_to_tensor(data):
 
 def convert_tensor_value_to_numpy(data):
     for key, value in data.items():
-        data[key] = value.numpy()
+        data[key] = value.cpu().numpy()
 
 
 if __name__ == "__main__":
