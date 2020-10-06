@@ -285,7 +285,7 @@ func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
 		}
 	}
 	alpha := accAlphaMap[randomUuid].Alpha[maxIndex]
-	acc := max/2
+	acc := max/float64(userNum)
 	fmt.Println("Found the max acc_test: ", acc, " with alpha: ", alpha)
 	return alpha
 }
