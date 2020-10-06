@@ -337,7 +337,7 @@ def conver_json_value_to_tensor(data):
 
 def convert_tensor_value_to_numpy(data):
     for key, value in data.items():
-        data[key] = value.numpy()
+        data[key] = value.cpu().numpy()
 
 
 class MainHandler(web.RequestHandler):
