@@ -107,7 +107,7 @@ def prepare():
 
     # multi-thread training here
     threads = []
-    for i in range(thread_number):
+    for i in range(user_number):
         thread_train = MultiTrainThread(str(uuid.uuid4()), w_glob, total_epochs, time.time())
         threads.append(thread_train)
 
@@ -150,7 +150,7 @@ async def train(uuid, w_glob, epochs, start_time):
     w_map[uuid] = {'w': w}
 
     # wait until w_map full
-    while len(w_map.keys()) != thread_number:
+    while len(w_map.keys()) != user_number:
         time.sleep(1)
     await average(w_map, uuid, epochs, start_time)
 
@@ -188,7 +188,7 @@ async def average(w_map, uuid, epochs, start_time):
     }
 
     # wait until w_glob_map full
-    while len(w_glob_map.keys()) != thread_number:
+    while len(w_glob_map.keys()) != user_number:
         time.sleep(1)
     # start step #5
     await negotiate(uuid, w_glob, w_glob_map, w_local, epochs, start_time)
@@ -227,7 +227,7 @@ async def negotiate(uuid, w_glob, w_glob_map, w_local, epochs, start_time):
     }
 
     # wait until acc_alpha_map full
-    while len(acc_alpha_map.keys()) != thread_number:
+    while len(acc_alpha_map.keys()) != user_number:
         time.sleep(1)
     best_alpha = find_max_acc_avg(acc_alpha_map)
     await next_round(best_alpha, w_map, w_glob_map, uuid, epochs, start_time)
