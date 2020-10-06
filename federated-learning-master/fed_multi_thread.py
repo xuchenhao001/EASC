@@ -53,7 +53,7 @@ def prepare():
     global total_epochs
     # parse args
     args = args_parser()
-    args.device = torch.device('cpu')
+    args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
     total_epochs = args.epochs
 
     # load dataset and split users
