@@ -72,7 +72,7 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 	recMsg.Uuid = myuuid
 	sendMsgAsBytes, _ := json.Marshal(recMsg)
 
-	sendPostRequest(sendMsgAsBytes, "PREPARE")
+	go sendPostRequest(sendMsgAsBytes, "PREPARE")
 
 	return nil
 }
