@@ -214,9 +214,7 @@ async def negotiate(uuid, w_glob, w_glob_map, w_local, epochs, start_time):
             w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
 
         # change parameters to model
-        # net_glob.load_state_dict(w_local2)
         net_glob.load_state_dict(w_local2)
-        net_glob = net_glob.to(args.device)
         net_glob.eval()
         # test the accuracy
         acc_test, loss_test = test_img(net_glob, dataset_test, args)
