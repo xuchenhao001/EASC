@@ -84,7 +84,7 @@ After you started a blockchain network, modify the network scale for rest server
 vim routes/rest/invoke-cc.js
 ```
 
-> Modify constant variable `networkScale` to `network-2-peers` or `network-4-peers`.
+> Modify constant variable `networkScale` to `network-2-peers`, `network-4-peers`, `network-10-peers` or `network-20-peers`.
 
 
 Start a blockchain rest server for communicate with blockchain network.
@@ -93,13 +93,20 @@ Start a blockchain rest server for communicate with blockchain network.
 cd blockchain-server/
 rm -rf routes/rest/wallet/
 npm start
+# Or start in background:
+nohup npm start > server.log 2>&1 &
 ```
 
 ### Federated Learning
 
 ```bash
 cd federated-learning-master/
+rm -f time-record_*
+# modify user_number to 2, 4, 10 or 20
+vim fed_server.py
 python3 fed_server.py
+# Or start in background
+nohup python3 -u fed_server.py > fed_server.log 2>&1 &
 ```
 
 Trigger training start:
