@@ -106,7 +106,7 @@ rm -f time-record_*
 vim fed_server.py
 python3 fed_server.py
 # Or start in background
-nohup python3 fed_server.py > fed_server.log 2>&1 &
+nohup python3 -u fed_server.py > fed_server.log 2>&1 &
 ```
 
 Trigger training start:
