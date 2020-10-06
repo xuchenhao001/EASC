@@ -9,14 +9,12 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 const url = "http://172.17.0.1:8888/messages"
 var myuuid string
-var userNum = 2
+var userNum int
 var negotiateRound = 10
-var emptyLen = 2
 
 type SmartContract struct {
 	contractapi.Contract
@@ -57,20 +55,79 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// unmarshal to read user number
+	dataMap := make(map[string]interface{})
+	dataJson, err := json.Marshal(recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recMsg.Data interface: %s", err.Error())
+	}
+	err = json.Unmarshal(dataJson, &dataMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal dataJson to dataMap: %s", err.Error())
+	}
+	userNum = int(dataMap["user_number"].(float64))
+	fmt.Println("Successfully loaded user number: ", userNum)
+
 	recMsg.Uuid = myuuid
 	sendMsgAsBytes, _ := json.Marshal(recMsg)
-
-	// clean wMap and accAlphaMap, prepare for train.
-	//fmt.Println("clean wMap, accAlphaMap and wGlobMap, prepare for train.")
-	//for epoch := recMsg.Epochs; epoch >= 1; epoch++ {
-	//	_ = ctx.GetStub().PutState("wMap" + strconv.Itoa(epoch), []byte(" "))
-	//	_ = ctx.GetStub().PutState("accAlphaMap" + strconv.Itoa(epoch), []byte(" "))
-	//	_ = ctx.GetStub().PutState("wGlobMap" + strconv.Itoa(epoch), []byte(" "))
-	//}
 
 	sendPostRequest(sendMsgAsBytes, "PREPARE")
 
 	return nil
+}
+
+func saveAsMap(ctx contractapi.TransactionContextInterface, keyType string, epochs int, myUUID string,
+	value interface{}) error {
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("save [" + keyType + "] map to DB in epoch [" + epochsString  + "] for uuid: [" + myUUID + "]")
+
+	key, err := ctx.GetStub().CreateCompositeKey(keyType, []string{epochsString, myUUID})
+	if err !=nil {
+		return fmt.Errorf("failed to composite key: %s", err.Error())
+	}
+
+	jsonAsBytes, _ := json.Marshal(value)
+	err = ctx.GetStub().PutState(key, jsonAsBytes)
+	if err != nil {
+		return fmt.Errorf("failed to save map into state: %s", err.Error())
+	}
+	return nil
+}
+
+func readAsMap(ctx contractapi.TransactionContextInterface,
+	keyType string, epochs int) (map[string]interface{}, error) {
+
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("read [" + keyType + "] map from DB in epoch [" + epochsString  + "]")
+
+	mapIter, err := ctx.GetStub().GetStateByPartialCompositeKey(keyType, []string{epochsString})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read map from state by partial composite key: %s", err.Error())
+	}
+	defer mapIter.Close()
+
+	resultMap := make(map[string]interface{})
+
+	for mapIter.HasNext() {
+		mapItem, err := mapIter.Next()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read next map item from state: %s", err.Error())
+		}
+
+		var compositeKeyAttri []string
+		_, compositeKeyAttri, err = ctx.GetStub().SplitCompositeKey(mapItem.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to split composite key: %s", err.Error())
+		}
+		var myUUID string
+		myUUID = compositeKeyAttri[1]
+		valueMap := make(map[string]interface{})
+		_ = json.Unmarshal(mapItem.Value, &valueMap)
+		resultMap[myUUID] = valueMap
+	}
+
+	return resultMap, nil
 }
 
 // STEP #4
@@ -80,34 +137,25 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
-	wMap := make(map[string]interface{})
-	wMapAsBytes, _ := ctx.GetStub().GetState("wMap" + strconv.Itoa(recMsg.Epochs))
-	println("Exist wMapAsBytes len: ", len(wMapAsBytes))
-	if wMapAsBytes == nil || len(wMapAsBytes) < emptyLen {
-		fmt.Println("wMap doesn't exist, create a new one for: " + recMsg.Uuid)
-		wMap[recMsg.Uuid] = recMsg.Data
-	} else {
-		fmt.Println("wMap exist, update it for: " + recMsg.Uuid)
-		_ = json.Unmarshal(wMapAsBytes, &wMap)
-		wMap[recMsg.Uuid] = recMsg.Data
-	}
-	// check all of the keys
-	keys := make([]string, 0, len(wMap))
-	for key := range wMap {
-		keys = append(keys, key)
-	}
-	fmt.Println("wMap keys: " + strings.Join(keys, ", "))
-
 	// store w map into blockchain
-	jsonAsBytes, _ := json.Marshal(wMap)
-	fmt.Println("update w map to DB")
-	println("Update wMapAsBytes len: ", len(jsonAsBytes))
-	err := ctx.GetStub().PutState("wMap" + strconv.Itoa(recMsg.Epochs), jsonAsBytes)
-	if err !=nil {
+	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	if err != nil {
 		return fmt.Errorf("failed to update w map into state. %s", err.Error())
 	}
+	return nil
+}
+
+func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[TRAIN READY MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
 	// count w map length. If gathered all of the w, average them and get global_w, release global_w
+	wMap, err := readAsMap(ctx, "wMap", recMsg.Epochs)
+	if err != nil {
+		return fmt.Errorf("failed to read w map from state. %s", err.Error())
+	}
 	if len(wMap) == userNum {
 		fmt.Println("gathered enough w map, send for global_w")
 		// average them, get global_w
@@ -118,8 +166,9 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 		sendMsg.Epochs = recMsg.Epochs
 		sendMsg.StartTime = recMsg.StartTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
-
 		go sendPostRequest(sendMsgAsBytes, "TRAIN")
+	} else {
+		fmt.Println("not gathered enough w map, do nothing")
 	}
 	return nil
 }
@@ -131,21 +180,9 @@ func (s *SmartContract) WGlob(ctx contractapi.TransactionContextInterface, recei
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 	// save w_glob to wGlobMap
-	wGlobMap := make(map[string]interface{})
-	wGlobMapAsBytes, _ := ctx.GetStub().GetState("wGlobMap" + strconv.Itoa(recMsg.Epochs))
-	if wGlobMapAsBytes == nil || len(wGlobMapAsBytes) < emptyLen {
-		fmt.Println("wGlobMap doesn't exist, create a new one for: " + recMsg.Uuid)
-		wGlobMap[recMsg.Uuid] = recMsg.Data
-	} else {
-		fmt.Println("wGlobMap exist, update it for: " + recMsg.Uuid)
-		_ = json.Unmarshal(wGlobMapAsBytes, &wGlobMap)
-		wGlobMap[recMsg.Uuid] = recMsg.Data
-	}
-	jsonAsBytes, _ := json.Marshal(wGlobMap)
-	fmt.Println("update w_glob map to DB")
-	err := ctx.GetStub().PutState("wGlobMap" + strconv.Itoa(recMsg.Epochs), jsonAsBytes)
-	if err !=nil {
-		return fmt.Errorf("failed to put w_glob map into state. %s", err.Error())
+	err := saveAsMap(ctx, "wGlobMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to update w_glob map into state. %s", err.Error())
 	}
 	return nil
 }
@@ -162,44 +199,49 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 	recMsg := new(HttpAccAlphaMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
-	// save accAlpha to accAlphaMap
-	accAlphaMap := make(map[string]AccAlpha)
-	accAlphaMapAsBytes, _ := ctx.GetStub().GetState("accAlphaMap" + strconv.Itoa(recMsg.Epochs))
-	if accAlphaMapAsBytes == nil || len(accAlphaMapAsBytes) < emptyLen {
-		fmt.Println("accAlphaMap doesn't exist, create a new one for: " + recMsg.Uuid)
-		accAlphaMap[recMsg.Uuid] = recMsg.Data
-	} else {
-		fmt.Println("accAlphaMap exist, update it for: " + recMsg.Uuid)
-		_ = json.Unmarshal(accAlphaMapAsBytes, &accAlphaMap)
-		accAlphaMap[recMsg.Uuid] = recMsg.Data
-	}
-	// check all of the keys
-	keys := make([]string, 0, len(accAlphaMap))
-	for key := range accAlphaMap {
-		keys = append(keys, key)
-	}
-	fmt.Println("accAlphaMap keys: " + strings.Join(keys, ", "))
-
-	// store accAlpha map into blockchain
-	jsonAsBytes, _ := json.Marshal(accAlphaMap)
-	fmt.Println("update accAlphaMap to DB")
-	err := ctx.GetStub().PutState("accAlphaMap" + strconv.Itoa(recMsg.Epochs), jsonAsBytes)
-	if err !=nil {
-		return fmt.Errorf("failed to put accAlphaMap into state. %s", err.Error())
+	// store acc_test and alpha map into blockchain
+	err := saveAsMap(ctx, "accAlphaMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to update acc_test and alpha map into state. %s", err.Error())
 	}
 
+	return nil
+}
+
+func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[NEGOTIATE READY MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpAccAlphaMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	var accAlphaMap = map[string]AccAlpha{}
+	accAlphaInterface, err := readAsMap(ctx, "accAlphaMap", recMsg.Epochs)
+	if err != nil {
+		return fmt.Errorf("failed to read acc_test and alpha map from state. %s", err.Error())
+	}
+	accAlphaString, err := json.Marshal(accAlphaInterface)
+	if err != nil {
+		return fmt.Errorf("failed to marshal accAlpha interface: %s", err.Error())
+	}
+	err = json.Unmarshal(accAlphaString, &accAlphaMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal accAlpha interface to accAlphaMap: %s", err.Error())
+	}
 	// count accAlpha map length. If gathered all of the acc_test, choose the best alpha according to the policy
 	// (findMaxAccAvg or findMinAccVar), release alpha and w
 	if len(accAlphaMap) == userNum {
 		fmt.Println("gathered enough acc_test and alpha, choose the best alpha according to the policy")
 		alpha := findMaxAccAvg(accAlphaMap)
 		// load w from db
-		wMap := make(map[string]interface{})
-		wMapAsBytes, _ := ctx.GetStub().GetState("wMap" + strconv.Itoa(recMsg.Epochs))
-		_ = json.Unmarshal(wMapAsBytes, &wMap)
-		wGlobMap := make(map[string]interface{})
-		wGlobMapAsBytes, _ := ctx.GetStub().GetState("wGlobMap" + strconv.Itoa(recMsg.Epochs))
-		_ = json.Unmarshal(wGlobMapAsBytes, &wGlobMap)
+		wMap, err := readAsMap(ctx, "wMap", recMsg.Epochs)
+		if err != nil {
+			return fmt.Errorf("failed to read wMap from state. %s", err.Error())
+		}
+		// load wGlobMap from db
+		wGlobMap, err := readAsMap(ctx, "wGlobMap", recMsg.Epochs)
+		if err != nil {
+			return fmt.Errorf("failed to read wGlobMap from state. %s", err.Error())
+		}
 		// release alpha and w
 		data := make(map[string]interface{})
 		data["alpha"] = alpha // alpha is included in data
@@ -214,7 +256,10 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 
 		go sendPostRequest(sendMsgAsBytes, "NEGOTIATE")
+	} else {
+		fmt.Println("not gathered enough acc_test and alpha, do nothing")
 	}
+
 	return nil
 }
 
@@ -240,7 +285,8 @@ func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
 		}
 	}
 	alpha := accAlphaMap[randomUuid].Alpha[maxIndex]
-	fmt.Println("Found the max acc_test: ", max/2, " with alpha: ", alpha)
+	acc := max/2
+	fmt.Println("Found the max acc_test: ", acc, " with alpha: ", alpha)
 	return alpha
 }
 
