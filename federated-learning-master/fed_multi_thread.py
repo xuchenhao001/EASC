@@ -22,7 +22,7 @@ from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img
 
-thread_number = 2
+user_number = 2
 total_epochs = 0
 args = None
 net_glob = None

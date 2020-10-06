@@ -141,6 +141,10 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
     logger.info("Received request type: train")
     await invoke(res, channelName, chaincodeName,'Train', JSON.stringify(req.body));
   }
+  else if (body.message === 'train_ready') {
+    logger.info("Received request type: train_ready")
+    await invoke(res, channelName, chaincodeName,'TrainReady', JSON.stringify(req.body));
+  }
   else if (body.message === 'w_glob') {
     logger.info("Received request type: w_glob")
     await invoke(res, channelName, chaincodeName,'WGlob', JSON.stringify(req.body));
@@ -148,6 +152,10 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
   else if (body.message === 'negotiate') {
     logger.info("Received request type: negotiate")
     await invoke(res, channelName, chaincodeName, 'Negotiate', JSON.stringify(req.body));
+  }
+  else if (body.message === 'negotiate_ready') {
+    logger.info("Received request type: negotiate_ready")
+    await invoke(res, channelName, chaincodeName, 'NegotiateReady', JSON.stringify(req.body));
   }
   else
     common.responseBadRequestError(res, 'No such request: ' + body.message);

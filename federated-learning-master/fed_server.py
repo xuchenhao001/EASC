@@ -11,6 +11,7 @@ from random import randrange
 matplotlib.use('Agg')
 import copy
 import numpy as np
+import threading
 from threading import Thread
 from torchvision import datasets, transforms
 import torch
@@ -33,6 +34,10 @@ dataset_train = None
 dataset_test = None
 dict_users = None
 idxs_users = None
+user_number = 2
+check_train_ready_map = {}
+check_negotiate_ready_map = {}
+lock = threading.Lock()
 
 
 def test(data):
@@ -124,6 +129,7 @@ async def prepare():
         'message': 'prepare',
         'data': {
             'w_glob': w_glob,
+            'user_number': user_number,
         },
         'start_time': time.time(),
         'epochs': total_epochs
@@ -157,6 +163,22 @@ async def train(data, uuid, epochs, start_time):
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'train')
     print(response)
+    # check train ready
+    lock.acquire()
+    check_train_ready_map[uuid] = True
+    if len(check_train_ready_map) == user_number:
+        body_data = {
+            'message': 'train_ready',
+            'epochs': epochs,
+            'start_time': start_time,
+        }
+        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+        response = await http_client_post(json_body, 'train_ready')
+        print(response)
+        check_train_ready_map.clear()
+    else:
+        print("train not ready, ignore")
+    lock.release()
 
 
 # STEP #4
@@ -248,6 +270,22 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'negotiate')
     print(response)
+    # check negotiate ready
+    lock.acquire()
+    check_negotiate_ready_map[my_uuid] = True
+    if len(check_negotiate_ready_map) == user_number:
+        body_data = {
+            'message': 'negotiate_ready',
+            'epochs': epochs,
+            'start_time': start_time,
+        }
+        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+        response = await http_client_post(json_body, 'negotiate_ready')
+        print(response)
+        check_negotiate_ready_map.clear()
+    else:
+        print("negotiate not ready, ignore")
+    lock.release()
 
 
 # STEP #7
