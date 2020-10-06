@@ -41,7 +41,15 @@ npm install
 pip3 install matplotlib numpy torch torchvision tornado sklearn
 ```
 
+### GPU
 
+It's better to have a gpu cuda, which could accelerate the training process. To check if you have any gpu(cuda):
+
+```bash
+nvidia-smi
+# or
+sudo lshw -C display
+```
 
 ## Run
 
