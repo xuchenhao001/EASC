@@ -370,7 +370,7 @@ function networkDown() {
     #Cleanup the chaincode containers
     clearContainers
     #Cleanup images
-    # removeUnwantedImages
+    removeUnwantedImages
     # remove orderer block and other channel configuration transactions and certs
     rm -rf system-genesis-block/*.block organizations/peerOrganizations organizations/ordererOrganizations
     ## remove fabric ca artifacts
