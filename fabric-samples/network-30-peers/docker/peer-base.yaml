@@ -22,5 +22,6 @@ services:
       - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
       # Chaincode Execution timeout
       - CORE_CHAINCODE_EXECUTETIMEOUT=30s
+      - CORE_CHAINCODE_INSTALLTIMEOUT=1200s
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
