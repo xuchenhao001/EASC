@@ -314,7 +314,8 @@ async def next_round(data, uuid, epochs, start_time):
     new_epochs = epochs - 1
     # before start next round, record the time
     with open("time-record_" + uuid + ".txt", "a") as time_record_file:
-        time_record_file.write("[" + f"{epochs:0>2}" + "] " + str(time.time() - start_time) + "\n")
+        current_time = time.strftime("%H:%M:%S", time.localtime())
+        time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "] " + str(time.time() - start_time) + "\n")
     if new_epochs > 0:
         print("##### Epoch #", new_epochs, " start now. #####")
         # reset a new time for next round
