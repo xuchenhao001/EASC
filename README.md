@@ -112,6 +112,8 @@ cd federated-learning-master/
 rm -f time-record_*
 # modify user_number to 2, 4, 10 or 20
 vim fed_server.py
+# modify gpu to use, such as 5
+vim utils/options.py
 python3 fed_server.py
 # Or start in background
 nohup python3 -u fed_server.py > fed_server.log 2>&1 &
