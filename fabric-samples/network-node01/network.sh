@@ -246,8 +246,11 @@ function createConsortium() {
 function networkUp() {
 
   checkPrereqs
-  createOrgs
-  createConsortium
+  # generate artifacts if they don't exist
+  if [ ! -d "organizations/peerOrganizations" ]; then
+    createOrgs
+    createConsortium
+  fi
 
   COMPOSE_FILES="-f ${COMPOSE_FILE_BASE}"
 
@@ -273,7 +276,7 @@ function releaseCerts() {
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
     scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-node${index}/organizations/
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index}/organizations/ && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz"
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz"
   done
   rm -f peerOrganizations.tar.gz
 }
