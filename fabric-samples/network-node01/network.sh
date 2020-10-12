@@ -13,8 +13,10 @@
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
 export PATH=${PWD}/../bin:$PATH
-export FABRIC_CFG_PATH=${PWD}/configtx
+export FABRIC_CFG_PATH=${PWD}/../configtx
 export VERBOSE=false
+
+source scriptUtils.sh
 
 # Print the usage message
 function printHelp() {
@@ -126,29 +128,6 @@ function checkPrereqs() {
     fi
   done
 
-  ## Check for fabric-ca
-  if [ "$CRYPTO" == "Certificate Authorities" ]; then
-
-    fabric-ca-client version > /dev/null 2>&1
-    if [[ $? -ne 0 ]]; then
-      echo "ERROR! fabric-ca-client binary not found.."
-      echo
-      echo "Follow the instructions in the Fabric docs to install the Fabric Binaries:"
-      echo "https://hyperledger-fabric.readthedocs.io/en/latest/install.html"
-      exit 1
-    fi
-    CA_LOCAL_VERSION=$(fabric-ca-client version | sed -ne 's/ Version: //p')
-    CA_DOCKER_IMAGE_VERSION=$(docker run --rm hyperledger/fabric-ca:$CA_IMAGETAG fabric-ca-client version | sed -ne 's/ Version: //p' | head -1)
-    echo "CA_LOCAL_VERSION=$CA_LOCAL_VERSION"
-    echo "CA_DOCKER_IMAGE_VERSION=$CA_DOCKER_IMAGE_VERSION"
-
-    if [ "$CA_LOCAL_VERSION" != "$CA_DOCKER_IMAGE_VERSION" ]; then
-      echo "=================== WARNING ======================"
-      echo "  Local fabric-ca binaries and docker images are  "
-      echo "  out of sync. This may cause problems.           "
-      echo "=================================================="
-    fi
-  fi
 }
 
 
@@ -183,40 +162,23 @@ function createOrgs() {
     rm -Rf organizations/peerOrganizations && rm -Rf organizations/ordererOrganizations
   fi
 
-  # Create crypto material using Fabric CAs
-  if [ "$CRYPTO" == "Certificate Authorities" ]; then
+  # Create crypto material using cryptogen
+  if [ "$CRYPTO" == "cryptogen" ]; then
+    which cryptogen
+    if [ "$?" -ne 0 ]; then
+      fatalln "cryptogen tool not found. exiting"
+    fi
+    infoln "Generate certificates using cryptogen tool"
 
-    echo
-    echo "##########################################################"
-    echo "##### Generate certificates using Fabric CA's ############"
-    echo "##########################################################"
+    infoln "Create Orgs Identities"
 
-    IMAGE_TAG=${CA_IMAGETAG} docker-compose -f $COMPOSE_FILE_CA up -d 2>&1
-
-    . organizations/fabric-ca/registerEnroll.sh
-
-    sleep 10
-
-    echo "##########################################################"
-    echo "############ Create OrgN Identities ######################"
-    echo "##########################################################"
-
-    createOrgN 1
-    createOrgN 2
-    createOrgN 3
-    createOrgN 4
-    createOrgN 5
-    createOrgN 6
-    createOrgN 7
-    createOrgN 8
-    createOrgN 9
-    createOrgN 10
-
-    echo "##########################################################"
-    echo "############ Create Orderer Org Identities ###############"
-    echo "##########################################################"
-
-    createOrderer
+    set -x
+    cryptogen generate --config=./organizations/crypto-config.yaml --output="organizations"
+    res=$?
+    { set +x; } 2>/dev/null
+    if [ $res -ne 0 ]; then
+      fatalln "Failed to generate certificates..."
+    fi
 
   fi
 
@@ -264,12 +226,10 @@ function createConsortium() {
 
   # Note: For some unknown reason (at least for now) the block file can't be
   # named orderer.genesis.block or the orderer will fail to launch!
-  cd ../
   set -x
-  configtxgen -profile TwoOrgsOrdererGenesis -channelID system-channel -outputBlock ./network-node01/system-genesis-block/genesis.block
+  configtxgen -profile TwoOrgsOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
   res=$?
   set +x
-  cd -
   if [ $res -ne 0 ]; then
     echo "Failed to generate orderer genesis block..."
     exit 1
@@ -286,11 +246,8 @@ function createConsortium() {
 function networkUp() {
 
   checkPrereqs
-  # generate artifacts if they don't exist
-  if [ ! -d "organizations/peerOrganizations" ]; then
-    createOrgs
-    createConsortium
-  fi
+  createOrgs
+  createConsortium
 
   COMPOSE_FILES="-f ${COMPOSE_FILE_BASE}"
 
@@ -305,6 +262,20 @@ function networkUp() {
     echo "ERROR !!!! Unable to start network"
     exit 1
   fi
+
+  releaseCerts
+}
+
+function releaseCerts() {
+  AllNodesAddrs=(10.137.3.71 10.137.3.68 10.137.3.20 10.137.3.69 10.137.3.6 10.137.3.23 10.137.3.90 10.137.3.91 10.137.3.88)
+
+  tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
+  for i in ${!AllNodesAddrs[@]}; do
+    index=$(printf "%02d" $((i+2)))
+    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-node${index}/organizations/
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index}/organizations/ && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz"
+  done
+  rm -f peerOrganizations.tar.gz
 }
 
 ## call the script to join create the channel and join the peers of org1 and org2
@@ -345,7 +316,7 @@ function deployCC() {
 
 # Tear down running network
 function networkDown() {
-  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH -f $COMPOSE_FILE_CA down --volumes --remove-orphans
+  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
   # Don't remove the generated artifacts -- note, the ledgers are always removed
   if [ "$MODE" != "restart" ]; then
     # Bring down the network, deleting the volumes
@@ -354,20 +325,7 @@ function networkDown() {
     #Cleanup images
     removeUnwantedImages
     # remove orderer block and other channel configuration transactions and certs
-    rm -rf system-genesis-block/*.block organizations/peerOrganizations organizations/ordererOrganizations
-    ## remove fabric ca artifacts
-    rm -rf organizations/fabric-ca/org1/msp organizations/fabric-ca/org1/tls-cert.pem organizations/fabric-ca/org1/ca-cert.pem organizations/fabric-ca/org1/IssuerPublicKey organizations/fabric-ca/org1/IssuerRevocationPublicKey organizations/fabric-ca/org1/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org2/msp organizations/fabric-ca/org2/tls-cert.pem organizations/fabric-ca/org2/ca-cert.pem organizations/fabric-ca/org2/IssuerPublicKey organizations/fabric-ca/org2/IssuerRevocationPublicKey organizations/fabric-ca/org2/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org3/msp organizations/fabric-ca/org3/tls-cert.pem organizations/fabric-ca/org3/ca-cert.pem organizations/fabric-ca/org3/IssuerPublicKey organizations/fabric-ca/org3/IssuerRevocationPublicKey organizations/fabric-ca/org3/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org4/msp organizations/fabric-ca/org4/tls-cert.pem organizations/fabric-ca/org4/ca-cert.pem organizations/fabric-ca/org4/IssuerPublicKey organizations/fabric-ca/org4/IssuerRevocationPublicKey organizations/fabric-ca/org4/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org5/msp organizations/fabric-ca/org5/tls-cert.pem organizations/fabric-ca/org5/ca-cert.pem organizations/fabric-ca/org5/IssuerPublicKey organizations/fabric-ca/org5/IssuerRevocationPublicKey organizations/fabric-ca/org5/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org6/msp organizations/fabric-ca/org6/tls-cert.pem organizations/fabric-ca/org6/ca-cert.pem organizations/fabric-ca/org6/IssuerPublicKey organizations/fabric-ca/org6/IssuerRevocationPublicKey organizations/fabric-ca/org6/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org7/msp organizations/fabric-ca/org7/tls-cert.pem organizations/fabric-ca/org7/ca-cert.pem organizations/fabric-ca/org7/IssuerPublicKey organizations/fabric-ca/org7/IssuerRevocationPublicKey organizations/fabric-ca/org7/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org8/msp organizations/fabric-ca/org8/tls-cert.pem organizations/fabric-ca/org8/ca-cert.pem organizations/fabric-ca/org8/IssuerPublicKey organizations/fabric-ca/org8/IssuerRevocationPublicKey organizations/fabric-ca/org8/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org9/msp organizations/fabric-ca/org9/tls-cert.pem organizations/fabric-ca/org9/ca-cert.pem organizations/fabric-ca/org9/IssuerPublicKey organizations/fabric-ca/org9/IssuerRevocationPublicKey organizations/fabric-ca/org9/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org10/msp organizations/fabric-ca/org10/tls-cert.pem organizations/fabric-ca/org10/ca-cert.pem organizations/fabric-ca/org10/IssuerPublicKey organizations/fabric-ca/org10/IssuerRevocationPublicKey organizations/fabric-ca/org10/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/ordererOrg/msp organizations/fabric-ca/ordererOrg/tls-cert.pem organizations/fabric-ca/ordererOrg/ca-cert.pem organizations/fabric-ca/ordererOrg/IssuerPublicKey organizations/fabric-ca/ordererOrg/IssuerRevocationPublicKey organizations/fabric-ca/ordererOrg/fabric-ca-server.db
-
+    rm -rf system-genesis-block organizations/peerOrganizations organizations/ordererOrganizations
     # remove channel and script artifacts
     rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
@@ -402,7 +360,7 @@ IMAGETAG="latest"
 # default ca image tag
 CA_IMAGETAG="latest"
 # default database
-DATABASE="leveldb"
+DATABASE="couchdb"
 
 # Parse commandline args
 
@@ -528,3 +486,4 @@ else
   printHelp
   exit 1
 fi
+
