@@ -1,0 +1,260 @@
+version: '2'
+
+volumes:
+  peer0.org81.example.com:
+  peer0.org82.example.com:
+  peer0.org83.example.com:
+  peer0.org84.example.com:
+  peer0.org85.example.com:
+  peer0.org86.example.com:
+  peer0.org87.example.com:
+  peer0.org88.example.com:
+  peer0.org89.example.com:
+  peer0.org90.example.com:
+
+networks:
+  test:
+
+services:
+
+  peer0.org81.example.com:
+    container_name: peer0.org81.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org81.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org81.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:7051
+      - CORE_PEER_LOCALMSPID=Org81MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org81.example.com/peers/peer0.org81.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org81.example.com/peers/peer0.org81.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org81.example.com:/var/hyperledger/production
+    ports:
+      - 7051:7051
+    networks:
+      - test
+
+  peer0.org82.example.com:
+    container_name: peer0.org82.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org82.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org82.example.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:9051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:9051
+      - CORE_PEER_LOCALMSPID=Org82MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org82.example.com/peers/peer0.org82.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org82.example.com/peers/peer0.org82.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org82.example.com:/var/hyperledger/production
+    ports:
+      - 9051:9051
+    networks:
+      - test
+
+  peer0.org83.example.com:
+    container_name: peer0.org83.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org83.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:10051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:10051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org83.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:10051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:10051
+      - CORE_PEER_LOCALMSPID=Org83MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org83.example.com/peers/peer0.org83.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org83.example.com/peers/peer0.org83.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org83.example.com:/var/hyperledger/production
+    ports:
+      - 10051:10051
+    networks:
+      - test
+
+  peer0.org84.example.com:
+    container_name: peer0.org84.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org84.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:11051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org84.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:11051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:11051
+      - CORE_PEER_LOCALMSPID=Org84MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org84.example.com/peers/peer0.org84.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org84.example.com/peers/peer0.org84.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org84.example.com:/var/hyperledger/production
+    ports:
+      - 11051:11051
+    networks:
+      - test
+
+  peer0.org85.example.com:
+    container_name: peer0.org85.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org85.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:12051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:12051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org85.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:12051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:12051
+      - CORE_PEER_LOCALMSPID=Org85MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org85.example.com/peers/peer0.org85.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org85.example.com/peers/peer0.org85.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org85.example.com:/var/hyperledger/production
+    ports:
+      - 12051:12051
+    networks:
+      - test
+
+  peer0.org86.example.com:
+    container_name: peer0.org86.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org86.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:13051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:13051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org86.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:13051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:13051
+      - CORE_PEER_LOCALMSPID=Org86MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org86.example.com/peers/peer0.org86.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org86.example.com/peers/peer0.org86.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org86.example.com:/var/hyperledger/production
+    ports:
+      - 13051:13051
+    networks:
+      - test
+
+  peer0.org87.example.com:
+    container_name: peer0.org87.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org87.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:14051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:14051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org87.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:14051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:14051
+      - CORE_PEER_LOCALMSPID=Org87MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org87.example.com/peers/peer0.org87.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org87.example.com/peers/peer0.org87.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org87.example.com:/var/hyperledger/production
+    ports:
+      - 14051:14051
+    networks:
+      - test
+
+  peer0.org88.example.com:
+    container_name: peer0.org88.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org88.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:15051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:15051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org88.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:15051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:15051
+      - CORE_PEER_LOCALMSPID=Org88MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org88.example.com/peers/peer0.org88.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org88.example.com/peers/peer0.org88.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org88.example.com:/var/hyperledger/production
+    ports:
+      - 15051:15051
+    networks:
+      - test
+
+  peer0.org89.example.com:
+    container_name: peer0.org89.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org89.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:16051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:16051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org89.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:16051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:16051
+      - CORE_PEER_LOCALMSPID=Org89MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org89.example.com/peers/peer0.org89.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org89.example.com/peers/peer0.org89.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org89.example.com:/var/hyperledger/production
+    ports:
+      - 16051:16051
+    networks:
+      - test
+
+  peer0.org90.example.com:
+    container_name: peer0.org90.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org90.example.com
+      - CORE_PEER_ADDRESS=10.137.3.91:17051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:17051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org90.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.91:17051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.91:17051
+      - CORE_PEER_LOCALMSPID=Org90MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org90.example.com/peers/peer0.org90.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org90.example.com/peers/peer0.org90.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org90.example.com:/var/hyperledger/production
+    ports:
+      - 17051:17051
+    networks:
+      - test
+
+
