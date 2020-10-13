@@ -194,7 +194,7 @@ function networkUp() {
 
 # Tear down running network
 function networkDown() {
-  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH -f $COMPOSE_FILE_CA down --volumes --remove-orphans
+  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
   # Don't remove the generated artifacts -- note, the ledgers are always removed
   if [ "$MODE" != "restart" ]; then
     # Bring down the network, deleting the volumes
@@ -204,18 +204,6 @@ function networkDown() {
     removeUnwantedImages
     # remove orderer block and other channel configuration transactions and certs
     rm -rf system-genesis-block/*.block organizations/peerOrganizations organizations/ordererOrganizations
-    ## remove fabric ca artifacts
-    rm -rf organizations/fabric-ca/org11/msp organizations/fabric-ca/org11/tls-cert.pem organizations/fabric-ca/org11/ca-cert.pem organizations/fabric-ca/org11/IssuerPublicKey organizations/fabric-ca/org11/IssuerRevocationPublicKey organizations/fabric-ca/org11/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org12/msp organizations/fabric-ca/org12/tls-cert.pem organizations/fabric-ca/org21/ca-cert.pem organizations/fabric-ca/org2/1IssuerPublicKey organizations/fabric-ca/org2/I1ssuerRevocationPublicKey organizations/fabric-ca/org2/fa1bric-ca-server.db
-    rm -rf organizations/fabric-ca/org13/msp organizations/fabric-ca/org13/tls-cert.pem organizations/fabric-ca/org3/1ca-cert.pem organizations/fabric-ca/org3/Is1suerPublicKey organizations/fabric-ca/org3/Issu1erRevocationPublicKey organizations/fabric-ca/org3/fabric1-ca-server.db
-    rm -rf organizations/fabric-ca/org14/msp organizations/fabric-ca/org14/tls-cert.pem organizations/fabric-ca/org4/c1a-cert.pem organizations/fabric-ca/org4/Issu1erPublicKey organizations/fabric-ca/org4/IssuerR1evocationPublicKey organizations/fabric-ca/org4/fabric-ca-1server.db
-    rm -rf organizations/fabric-ca/org15/msp organizations/fabric-ca/org15/tls-cert.pem organizations/fabric-ca/org5/ca1-cert.pem organizations/fabric-ca/org5/Issuer1PublicKey organizations/fabric-ca/org5/IssuerRevo1cationPublicKey organizations/fabric-ca/org5/fabric-ca-serv1er.db
-    rm -rf organizations/fabric-ca/org16/msp organizations/fabric-ca/org16/tls-cert.pem organizations/fabric-ca/org6/ca-1cert.pem organizations/fabric-ca/org6/IssuerPu1blicKey organizations/fabric-ca/org6/IssuerRevocat1ionPublicKey organizations/fabric-ca/org6/fabric-ca-server.d1b
-    rm -rf organizations/fabric-ca/org17/msp organizations/fabric-ca/org17/tls-cert.pem organizations/fabric-ca/org7/ca-c1ert.pem organizations/fabric-ca/org7/IssuerPubl1icKey organizations/fabric-ca/org7/IssuerRevocation1PublicKey organizations/fabric-ca/org7/fabric-ca-server.d1b
-    rm -rf organizations/fabric-ca/org18/msp organizations/fabric-ca/org18/tls-cert.pem organizations/fabric-ca/org8/ca-ce1rt.pem organizations/fabric-ca/org8/IssuerPublic1Key organizations/fabric-ca/org8/IssuerRevocationPub1licKey organizations/fabric-ca/org8/fabric-ca-server.d1b
-    rm -rf organizations/fabric-ca/org19/msp organizations/fabric-ca/org19/tls-cert.pem organizations/fabric-ca/org9/ca-cer1t.pem organizations/fabric-ca/org9/IssuerPublicKe1y organizations/fabric-ca/org9/IssuerRevocationPublic1Key organizations/fabric-ca/org9/fabric-ca-server.d1b
-    rm -rf organizations/fabric-ca/org20/msp organizations/fabric-ca/org20/tls-cert.pem organizations/fabric-ca/org10/ca-ce2t.pem organizations/fabric-ca/org10/IssuerPublicK2y organizations/fabric-ca/org10/IssuerRevocationPubli2Key organizations/fabric-ca/org10/fabric-ca-server.2b
-
     # remove channel and script artifacts
     rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
