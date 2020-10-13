@@ -1,0 +1,311 @@
+OrdererOrgs:
+  - Name: Orderer
+    Domain: example.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+        SANS:
+          - localhost
+          - 10.137.3.70
+PeerOrgs:
+  - Name: Org1
+    Domain: org1.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node01Addr 10.137.3.70
+    Users:
+      Count: 1
+  - Name: Org2
+    Domain: org2.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node01Addr
+    Users:
+      Count: 1
+  - Name: Org3
+    Domain: org3.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node01Addr
+    Users:
+      Count: 1
+  - Name: Org4
+    Domain: org4.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node02Addr 10.137.3.71
+    Users:
+      Count: 1
+  - Name: Org5
+    Domain: org5.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node02Addr
+    Users:
+      Count: 1
+  - Name: Org6
+    Domain: org6.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node02Addr
+    Users:
+      Count: 1
+  - Name: Org7
+    Domain: org7.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node03Addr 10.137.3.68
+    Users:
+      Count: 1
+  - Name: Org8
+    Domain: org8.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node03Addr
+    Users:
+      Count: 1
+  - Name: Org9
+    Domain: org9.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node03Addr
+    Users:
+      Count: 1
+  - Name: Org10
+    Domain: org10.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node04Addr 10.137.3.20
+    Users:
+      Count: 1
+  - Name: Org11
+    Domain: org11.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node04Addr
+    Users:
+      Count: 1
+  - Name: Org12
+    Domain: org12.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node04Addr
+    Users:
+      Count: 1
+  - Name: Org13
+    Domain: org13.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node05Addr 10.137.3.69
+    Users:
+      Count: 1
+  - Name: Org14
+    Domain: org14.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node05Addr
+    Users:
+      Count: 1
+  - Name: Org15
+    Domain: org15.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node05Addr
+    Users:
+      Count: 1
+  - Name: Org16
+    Domain: org16.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node06Addr 10.137.3.6
+    Users:
+      Count: 1
+  - Name: Org17
+    Domain: org17.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node06Addr
+    Users:
+      Count: 1
+  - Name: Org18
+    Domain: org18.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node06Addr
+    Users:
+      Count: 1
+  - Name: Org19
+    Domain: org19.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node07Addr 10.137.3.23
+    Users:
+      Count: 1
+  - Name: Org20
+    Domain: org20.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node07Addr
+    Users:
+      Count: 1
+  - Name: Org21
+    Domain: org21.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node07Addr
+    Users:
+      Count: 1
+  - Name: Org22
+    Domain: org22.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node08Addr 10.137.3.90
+    Users:
+      Count: 1
+  - Name: Org23
+    Domain: org23.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node08Addr
+    Users:
+      Count: 1
+  - Name: Org24
+    Domain: org24.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node08Addr
+    Users:
+      Count: 1
+  - Name: Org25
+    Domain: org25.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node09Addr 10.137.3.91
+    Users:
+      Count: 1
+  - Name: Org26
+    Domain: org26.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node09Addr
+    Users:
+      Count: 1
+  - Name: Org27
+    Domain: org27.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node09Addr
+    Users:
+      Count: 1
+  - Name: Org28
+    Domain: org28.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - &Node10Addr 10.137.3.88
+    Users:
+      Count: 1
+  - Name: Org29
+    Domain: org29.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node10Addr
+    Users:
+      Count: 1
+  - Name: Org30
+    Domain: org30.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - *Node10Addr
+    Users:
+      Count: 1
+
