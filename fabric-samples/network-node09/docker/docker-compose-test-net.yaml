@@ -1,84 +1,59 @@
 version: '2'
 
 volumes:
-  peer0.org25.example.com:
-  peer0.org26.example.com:
-  peer0.org27.example.com:
+  peer0.org17.example.com:
+  peer0.org18.example.com:
 
 networks:
   test:
 
 services:
 
-  peer0.org25.example.com:
-    container_name: peer0.org25.example.com
+  peer0.org17.example.com:
+    container_name: peer0.org17.example.com
     extends:
       file: peer-base.yaml
       service: peer-base
     environment:
-      - CORE_PEER_ID=peer0.org25.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:12051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:12051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org25.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:12051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:12051
-      - CORE_PEER_LOCALMSPID=Org25MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org25.example.com/peers/peer0.org25.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org25.example.com/peers/peer0.org25.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org25.example.com:/var/hyperledger/production
-    ports:
-      - 12051:12051
-    networks:
-      - test
-
-  peer0.org26.example.com:
-    container_name: peer0.org26.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
-    environment:
-      - CORE_PEER_ID=peer0.org26.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:13051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:13051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org26.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:13051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:13051
-      - CORE_PEER_LOCALMSPID=Org26MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org26.example.com/peers/peer0.org26.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org26.example.com/peers/peer0.org26.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org26.example.com:/var/hyperledger/production
-    ports:
-      - 13051:13051
-    networks:
-      - test
-
-  peer0.org27.example.com:
-    container_name: peer0.org27.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
-    environment:
-      - CORE_PEER_ID=peer0.org27.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:14051
+      - CORE_PEER_ID=peer0.org17.example.com
+      - CORE_PEER_ADDRESS=10.137.3.71:14051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:14051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org27.example.com:7052
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org17.example.com:7052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:14051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:14051
-      - CORE_PEER_LOCALMSPID=Org27MSP
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.71:14051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.71:14051
+      - CORE_PEER_LOCALMSPID=Org17MSP
     volumes:
         - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org27.example.com/peers/peer0.org27.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org27.example.com/peers/peer0.org27.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org27.example.com:/var/hyperledger/production
+        - ../organizations/peerOrganizations/org17.example.com/peers/peer0.org17.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org17.example.com/peers/peer0.org17.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org17.example.com:/var/hyperledger/production
     ports:
       - 14051:14051
+    networks:
+      - test
+
+  peer0.org18.example.com:
+    container_name: peer0.org18.example.com
+    extends:
+      file: peer-base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org18.example.com
+      - CORE_PEER_ADDRESS=10.137.3.71:15051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:15051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org18.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.71:15051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.71:15051
+      - CORE_PEER_LOCALMSPID=Org18MSP
+    volumes:
+        - /var/run/:/host/var/run/
+        - ../organizations/peerOrganizations/org18.example.com/peers/peer0.org18.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org18.example.com/peers/peer0.org18.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org18.example.com:/var/hyperledger/production
+    ports:
+      - 15051:15051
     networks:
       - test
 

@@ -5,63 +5,43 @@ networks:
 
 services:
 
-  couchdborg16:
-    container_name: couchdborg16
+  couchdborg11:
+    container_name: couchdborg11
     image: hyperledger/fabric-couchdb
     environment:
       - COUCHDB_USER=
       - COUCHDB_PASSWORD=
     ports:
-      - "13984:5984"
+      - "5984:5984"
     networks:
       - test
 
-  peer0.org16.example.com:
+  peer0.org11.example.com:
     environment:
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg16:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg11:5984
       - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
       - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
     depends_on:
-      - couchdborg16
+      - couchdborg11
 
-  couchdborg17:
-    container_name: couchdborg17
+  couchdborg12:
+    container_name: couchdborg12
     image: hyperledger/fabric-couchdb
     environment:
       - COUCHDB_USER=
       - COUCHDB_PASSWORD=
     ports:
-      - "14984:5984"
+      - "7984:5984"
     networks:
       - test
 
-  peer0.org17.example.com:
+  peer0.org12.example.com:
     environment:
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg17:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg12:5984
       - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
       - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
     depends_on:
-      - couchdborg17
-
-  couchdborg18:
-    container_name: couchdborg18
-    image: hyperledger/fabric-couchdb
-    environment:
-      - COUCHDB_USER=
-      - COUCHDB_PASSWORD=
-    ports:
-      - "15984:5984"
-    networks:
-      - test
-
-  peer0.org18.example.com:
-    environment:
-      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg18:5984
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
-    depends_on:
-      - couchdborg18
+      - couchdborg12
 

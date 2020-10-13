@@ -1,82 +1,57 @@
 version: '2'
 
 volumes:
-  peer0.org28.example.com:
-  peer0.org29.example.com:
-  peer0.org30.example.com:
+  peer0.org19.example.com:
+  peer0.org20.example.com:
 
 networks:
   test:
 
 services:
 
-  peer0.org28.example.com:
-    container_name: peer0.org28.example.com
+  peer0.org19.example.com:
+    container_name: peer0.org19.example.com
     extends:
       file: peer-base.yaml
       service: peer-base
     environment:
-      - CORE_PEER_ID=peer0.org28.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:15051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:15051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org28.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:15051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:15051
-      - CORE_PEER_LOCALMSPID=Org28MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org28.example.com/peers/peer0.org28.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org28.example.com/peers/peer0.org28.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org28.example.com:/var/hyperledger/production
-    ports:
-      - 15051:15051
-    networks:
-      - test
-
-  peer0.org29.example.com:
-    container_name: peer0.org29.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
-    environment:
-      - CORE_PEER_ID=peer0.org29.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:16051
+      - CORE_PEER_ID=peer0.org19.example.com
+      - CORE_PEER_ADDRESS=10.137.3.71:16051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:16051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org29.example.com:7052
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org19.example.com:7052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:16051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:16051
-      - CORE_PEER_LOCALMSPID=Org29MSP
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.71:16051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.71:16051
+      - CORE_PEER_LOCALMSPID=Org19MSP
     volumes:
         - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org29.example.com/peers/peer0.org29.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org29.example.com/peers/peer0.org29.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org29.example.com:/var/hyperledger/production
+        - ../organizations/peerOrganizations/org19.example.com/peers/peer0.org19.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org19.example.com/peers/peer0.org19.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org19.example.com:/var/hyperledger/production
     ports:
       - 16051:16051
     networks:
       - test
 
-  peer0.org30.example.com:
-    container_name: peer0.org30.example.com
+  peer0.org20.example.com:
+    container_name: peer0.org20.example.com
     extends:
       file: peer-base.yaml
       service: peer-base
     environment:
-      - CORE_PEER_ID=peer0.org30.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:17051
+      - CORE_PEER_ID=peer0.org20.example.com
+      - CORE_PEER_ADDRESS=10.137.3.71:17051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:17051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org30.example.com:7052
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org20.example.com:7052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:17051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:17051
-      - CORE_PEER_LOCALMSPID=Org30MSP
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.71:17051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.71:17051
+      - CORE_PEER_LOCALMSPID=Org20MSP
     volumes:
         - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org30.example.com/peers/peer0.org30.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org30.example.com/peers/peer0.org30.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org30.example.com:/var/hyperledger/production
+        - ../organizations/peerOrganizations/org20.example.com/peers/peer0.org20.example.com/msp:/etc/hyperledger/fabric/msp
+        - ../organizations/peerOrganizations/org20.example.com/peers/peer0.org20.example.com/tls:/etc/hyperledger/fabric/tls
+        - peer0.org20.example.com:/var/hyperledger/production
     ports:
       - 17051:17051
     networks:
