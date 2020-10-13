@@ -1,20 +1,12 @@
 #!/bin/bash
-#
-# Copyright IBM Corp All Rights Reserved
-#
-# SPDX-License-Identifier: Apache-2.0
-#
 
-# This script brings up a Hyperledger Fabric network for testing smart contracts
-# and applications. The test network consists of two organizations with one
-# peer each, and a single node Raft ordering service. Users can also use this
-# script to create a channel deploy a chaincode on the channel
-#
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/../configtx
 export VERBOSE=false
+
+AllNodesAddrs=(10.137.3.71 10.137.3.68 10.137.3.20 10.137.3.69 10.137.3.6 10.137.3.23 10.137.3.90 10.137.3.91 10.137.3.88)
 
 source scriptUtils.sh
 
@@ -50,7 +42,7 @@ function printHelp() {
   echo "  network.sh deployCC -l -v -r -d -verbose"
   echo
   echo " Taking all defaults:"
-  echo "	network.sh up"
+  echo "  network.sh up"
   echo
   echo " Examples:"
   echo "  network.sh up createChannel -ca -c mychannel -s couchdb -i 2.0.0"
@@ -130,31 +122,6 @@ function checkPrereqs() {
 
 }
 
-
-# Before you can bring up a network, each organization needs to generate the crypto
-# material that will define that organization on the network. Because Hyperledger
-# Fabric is a permissioned blockchain, each node and user on the network needs to
-# use certificates and keys to sign and verify its actions. In addition, each user
-# needs to belong to an organization that is recognized as a member of the network.
-# You can use the Cryptogen tool or Fabric CAs to generate the organization crypto
-# material.
-
-# By default, the sample network uses cryptogen. Cryptogen is a tool that is
-# meant for development and testing that can quicky create the certificates and keys
-# that can be consumed by a Fabric network. The cryptogen tool consumes a series
-# of configuration files for each organization in the "organizations/cryptogen"
-# directory. Cryptogen uses the files to generate the crypto  material for each
-# org in the "organizations" directory.
-
-# You can also Fabric CAs to generate the crypto material. CAs sign the certificates
-# and keys that they generate to create a valid root of trust for each organization.
-# The script uses Docker Compose to bring up three CAs, one for each peer organization
-# and the ordering organization. The configuration file for creating the Fabric CA
-# servers are in the "organizations/fabric-ca" directory. Within the same diectory,
-# the "registerEnroll.sh" script uses the Fabric CA client to create the identites,
-# certificates, and MSP folders that are needed to create the test network in the
-# "organizations/ordererOrganizations" directory.
-
 # Create Organziation crypto material using cryptogen or CAs
 function createOrgs() {
 
@@ -186,32 +153,6 @@ function createOrgs() {
   echo "Generate CCP files for Orgs"
   ./organizations/ccp-generate.sh
 }
-
-# Once you create the organization crypto material, you need to create the
-# genesis block of the orderer system channel. This block is required to bring
-# up any orderer nodes and create any application channels.
-
-# The configtxgen tool is used to create the genesis block. Configtxgen consumes a
-# "configtx.yaml" file that contains the definitions for the sample network. The
-# genesis block is defiend using the "TwoOrgsOrdererGenesis" profile at the bottom
-# of the file. This profile defines a sample consortium, "SampleConsortium",
-# consisting of our two Peer Orgs. This consortium defines which organizations are
-# recognized as members of the network. The peer and ordering organizations are defined
-# in the "Profiles" section at the top of the file. As part of each organization
-# profile, the file points to a the location of the MSP directory for each member.
-# This MSP is used to create the channel MSP that defines the root of trust for
-# each organization. In essense, the channel MSP allows the nodes and users to be
-# recognized as network members. The file also specifies the anchor peers for each
-# peer org. In future steps, this same file is used to create the channel creation
-# transaction and the anchor peer updates.
-#
-#
-# If you receive the following warning, it can be safely ignored:
-#
-# [bccsp] GetDefault -> WARN 001 Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.
-#
-# You can ignore the logs regarding intermediate certs, we are not using them in
-# this crypto implementation.
 
 # Generate orderer system channel genesis block.
 function createConsortium() {
@@ -270,13 +211,11 @@ function networkUp() {
 }
 
 function releaseCerts() {
-  AllNodesAddrs=(10.137.3.71 10.137.3.68 10.137.3.20 10.137.3.69 10.137.3.6 10.137.3.23 10.137.3.90 10.137.3.91 10.137.3.88)
-
   tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-node${index}/organizations/
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz"
+    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-node${index}/peerOrganizations.tar.gz
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
   done
   rm -f peerOrganizations.tar.gz
 }
@@ -320,19 +259,15 @@ function deployCC() {
 # Tear down running network
 function networkDown() {
   docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
-  # Don't remove the generated artifacts -- note, the ledgers are always removed
-  if [ "$MODE" != "restart" ]; then
-    # Bring down the network, deleting the volumes
-    #Cleanup the chaincode containers
-    clearContainers
-    #Cleanup images
-    removeUnwantedImages
-    # remove orderer block and other channel configuration transactions and certs
-    rm -rf system-genesis-block organizations/peerOrganizations organizations/ordererOrganizations
-    # remove channel and script artifacts
-    rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
+  clearContainers
+  removeUnwantedImages
+  rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
+  rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
-  fi
+  for i in ${!AllNodesAddrs[@]}; do
+    index=$(printf "%02d" $((i+2)))
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-node${index} && ./network.sh down && rm -rf organizations/"
+  done
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
