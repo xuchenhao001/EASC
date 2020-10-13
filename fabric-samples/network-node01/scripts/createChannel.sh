@@ -136,16 +136,6 @@ createAncorPeerTx Org7MSP
 createAncorPeerTx Org8MSP
 createAncorPeerTx Org9MSP
 createAncorPeerTx Org10MSP
-createAncorPeerTx Org11MSP
-createAncorPeerTx Org12MSP
-createAncorPeerTx Org13MSP
-createAncorPeerTx Org14MSP
-createAncorPeerTx Org15MSP
-createAncorPeerTx Org16MSP
-createAncorPeerTx Org17MSP
-createAncorPeerTx Org18MSP
-createAncorPeerTx Org19MSP
-createAncorPeerTx Org20MSP
 
 # FABRIC_CFG_PATH=$PWD/../config/
 
@@ -165,16 +155,6 @@ joinChannel 7
 joinChannel 8
 joinChannel 9
 joinChannel 10
-joinChannel 11
-joinChannel 12
-joinChannel 13
-joinChannel 14
-joinChannel 15
-joinChannel 16
-joinChannel 17
-joinChannel 18
-joinChannel 19
-joinChannel 20
 
 ## Set the anchor peers for each org in the channel
 echo "Updating anchor peers for orgs..."
@@ -188,16 +168,6 @@ updateAnchorPeers 7
 updateAnchorPeers 8
 updateAnchorPeers 9
 updateAnchorPeers 10
-updateAnchorPeers 11
-updateAnchorPeers 12
-updateAnchorPeers 13
-updateAnchorPeers 14
-updateAnchorPeers 15
-updateAnchorPeers 16
-updateAnchorPeers 17
-updateAnchorPeers 18
-updateAnchorPeers 19
-updateAnchorPeers 20
 
 echo
 echo "========= Channel successfully joined =========== "

@@ -249,7 +249,7 @@ chaincodeQuery() {
   fi
 }
 
-SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member','Org11MSP.member','Org12MSP.member','Org13MSP.member','Org14MSP.member','Org15MSP.member','Org16MSP.member','Org17MSP.member','Org18MSP.member','Org19MSP.member','Org20MSP.member')"
+SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member')"
 
 ## at first we package the chaincode
 packageChaincode 1
@@ -266,16 +266,6 @@ installChaincode 7
 installChaincode 8
 installChaincode 9
 installChaincode 10
-installChaincode 11
-installChaincode 12
-installChaincode 13
-installChaincode 14
-installChaincode 15
-installChaincode 16
-installChaincode 17
-installChaincode 18
-installChaincode 19
-installChaincode 20
 
 ## query whether the chaincode is installed
 queryInstalled 1
@@ -301,29 +291,9 @@ approveForMyOrg 9
 checkCommitReadiness 9 "\"Org9MSP\": true"
 approveForMyOrg 10
 checkCommitReadiness 10 "\"Org10MSP\": true"
-approveForMyOrg 11
-checkCommitReadiness 11 "\"Org11MSP\": true"
-approveForMyOrg 12
-checkCommitReadiness 12 "\"Org12MSP\": true"
-approveForMyOrg 13
-checkCommitReadiness 13 "\"Org13MSP\": true"
-approveForMyOrg 14
-checkCommitReadiness 14 "\"Org14MSP\": true"
-approveForMyOrg 15
-checkCommitReadiness 15 "\"Org15MSP\": true"
-approveForMyOrg 16
-checkCommitReadiness 16 "\"Org16MSP\": true"
-approveForMyOrg 17
-checkCommitReadiness 17 "\"Org17MSP\": true"
-approveForMyOrg 18
-checkCommitReadiness 18 "\"Org18MSP\": true"
-approveForMyOrg 19
-checkCommitReadiness 19 "\"Org19MSP\": true"
-approveForMyOrg 20
-checkCommitReadiness 20 "\"Org20MSP\": true"
 
 ## now that we know for sure both orgs have approved, commit the definition
-commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10
 
 ## query on both orgs to see that the definition committed successfully
 queryCommitted 1
@@ -336,19 +306,9 @@ queryCommitted 7
 queryCommitted 8
 queryCommitted 9
 queryCommitted 10
-queryCommitted 11
-queryCommitted 12
-queryCommitted 13
-queryCommitted 14
-queryCommitted 15
-queryCommitted 16
-queryCommitted 17
-queryCommitted 18
-queryCommitted 19
-queryCommitted 20
 
 ## Invoke the chaincode
-chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10
 
 sleep 10
 
