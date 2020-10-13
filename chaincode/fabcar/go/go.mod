@@ -1,4 +1,4 @@
-module github.com/hyperledger/fabric-samples/chaincode/fabcar/go
+module github.com/hyperledger/chaincode/fabcar/go
 
 go 1.15
 
