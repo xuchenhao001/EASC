@@ -5,7 +5,6 @@ volumes:
   peer0.org1.example.com:
   peer0.org2.example.com:
   peer0.org3.example.com:
-  peer0.org4.example.com:
 
 networks:
   test:
@@ -117,26 +116,3 @@ services:
     networks:
       - test
 
-  peer0.org4.example.com:
-    container_name: peer0.org4.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
-    environment:
-      - CORE_PEER_ID=peer0.org4.example.com
-      - CORE_PEER_ADDRESS=10.137.3.70:11051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org4.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.70:11051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.70:11051
-      - CORE_PEER_LOCALMSPID=Org4MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org4.example.com/peers/peer0.org4.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org4.example.com/peers/peer0.org4.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org4.example.com:/var/hyperledger/production
-    ports:
-      - 11051:11051
-    networks:
-      - test

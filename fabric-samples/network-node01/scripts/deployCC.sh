@@ -249,7 +249,7 @@ chaincodeQuery() {
   fi
 }
 
-SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member','Org11MSP.member','Org12MSP.member','Org13MSP.member','Org14MSP.member','Org15MSP.member','Org16MSP.member','Org17MSP.member','Org18MSP.member','Org19MSP.member','Org20MSP.member','Org21MSP.member','Org22MSP.member','Org23MSP.member','Org24MSP.member','Org25MSP.member','Org26MSP.member','Org27MSP.member','Org28MSP.member','Org29MSP.member','Org30MSP.member','Org31MSP.member','Org32MSP.member','Org33MSP.member','Org34MSP.member','Org35MSP.member','Org36MSP.member','Org37MSP.member','Org38MSP.member','Org39MSP.member','Org40MSP.member')"
+SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member','Org11MSP.member','Org12MSP.member','Org13MSP.member','Org14MSP.member','Org15MSP.member','Org16MSP.member','Org17MSP.member','Org18MSP.member','Org19MSP.member','Org20MSP.member','Org21MSP.member','Org22MSP.member','Org23MSP.member','Org24MSP.member','Org25MSP.member','Org26MSP.member','Org27MSP.member','Org28MSP.member','Org29MSP.member','Org30MSP.member')"
 
 ## at first we package the chaincode
 packageChaincode 1
@@ -286,16 +286,6 @@ installChaincode 27
 installChaincode 28
 installChaincode 29
 installChaincode 30
-installChaincode 31
-installChaincode 32
-installChaincode 33
-installChaincode 34
-installChaincode 35
-installChaincode 36
-installChaincode 37
-installChaincode 38
-installChaincode 39
-installChaincode 40
 
 ## query whether the chaincode is installed
 queryInstalled 1
@@ -361,29 +351,9 @@ approveForMyOrg 29
 checkCommitReadiness 29 "\"Org29MSP\": true"
 approveForMyOrg 30
 checkCommitReadiness 30 "\"Org30MSP\": true"
-approveForMyOrg 31
-checkCommitReadiness 31 "\"Org31MSP\": true"
-approveForMyOrg 32
-checkCommitReadiness 32 "\"Org32MSP\": true"
-approveForMyOrg 33
-checkCommitReadiness 33 "\"Org33MSP\": true"
-approveForMyOrg 34
-checkCommitReadiness 34 "\"Org34MSP\": true"
-approveForMyOrg 35
-checkCommitReadiness 35 "\"Org35MSP\": true"
-approveForMyOrg 36
-checkCommitReadiness 36 "\"Org36MSP\": true"
-approveForMyOrg 37
-checkCommitReadiness 37 "\"Org37MSP\": true"
-approveForMyOrg 38
-checkCommitReadiness 38 "\"Org38MSP\": true"
-approveForMyOrg 39
-checkCommitReadiness 39 "\"Org39MSP\": true"
-approveForMyOrg 40
-checkCommitReadiness 40 "\"Org40MSP\": true"
 
 ## now that we know for sure both orgs have approved, commit the definition
-commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
+commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
 
 ## query on both orgs to see that the definition committed successfully
 queryCommitted 1
@@ -416,19 +386,9 @@ queryCommitted 27
 queryCommitted 28
 queryCommitted 29
 queryCommitted 30
-queryCommitted 31
-queryCommitted 32
-queryCommitted 33
-queryCommitted 34
-queryCommitted 35
-queryCommitted 36
-queryCommitted 37
-queryCommitted 38
-queryCommitted 39
-queryCommitted 40
 
 ## Invoke the chaincode
-chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
+chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
 
 sleep 10
 
