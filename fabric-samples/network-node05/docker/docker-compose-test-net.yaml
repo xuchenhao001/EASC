@@ -1,5 +1,11 @@
 version: '2'
 
+volumes:
+  peer0.org17.example.com:
+  peer0.org18.example.com:
+  peer0.org19.example.com:
+  peer0.org20.example.com:
+
 networks:
   test:
 
