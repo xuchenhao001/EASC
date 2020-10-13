@@ -2,7 +2,7 @@
 
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
-export PATH=${PWD}/../bin:$PATH
+export PATH=${PWD}/../../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/../configtx
 export VERBOSE=false
 
@@ -214,8 +214,8 @@ function releaseCerts() {
   tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/network-10-peers/network-node${index}/peerOrganizations.tar.gz
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-10-peers/network-node${index}/peerOrganizations.tar.gz
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
   done
   rm -f peerOrganizations.tar.gz
 }
@@ -266,7 +266,7 @@ function networkDown() {
 
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/network-10-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
   done
 }
 
