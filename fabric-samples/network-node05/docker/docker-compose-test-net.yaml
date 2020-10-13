@@ -1,134 +1,88 @@
 version: '2'
 
-volumes:
-  peer0.org21.example.com:
-  peer0.org22.example.com:
-  peer0.org23.example.com:
-  peer0.org24.example.com:
-  peer0.org25.example.com:
-
 networks:
   test:
 
 services:
 
-  peer0.org21.example.com:
-    container_name: peer0.org21.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
+  couchdborg17:
+    container_name: couchdborg17
+    image: hyperledger/fabric-couchdb
     environment:
-      - CORE_PEER_ID=peer0.org21.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:7051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org21.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:7051
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:7051
-      - CORE_PEER_LOCALMSPID=Org21MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org21.example.com/peers/peer0.org21.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org21.example.com/peers/peer0.org21.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org21.example.com:/var/hyperledger/production
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
     ports:
-      - 7051:7051
+      - "14984:5984"
     networks:
       - test
 
-  peer0.org22.example.com:
-    container_name: peer0.org22.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
+  peer0.org17.example.com:
     environment:
-      - CORE_PEER_ID=peer0.org22.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:9051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org22.example.com:9052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:9051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:9051
-      - CORE_PEER_LOCALMSPID=Org22MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org22.example.com/peers/peer0.org22.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org22.example.com/peers/peer0.org22.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org22.example.com:/var/hyperledger/production
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg17:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
+    depends_on:
+      - couchdborg17
+
+  couchdborg18:
+    container_name: couchdborg18
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
     ports:
-      - 9051:9051
+      - "15984:5984"
     networks:
       - test
 
-  peer0.org23.example.com:
-    container_name: peer0.org23.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
+  peer0.org18.example.com:
     environment:
-      - CORE_PEER_ID=peer0.org23.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:10051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:10051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org23.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:10051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:10051
-      - CORE_PEER_LOCALMSPID=Org23MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org23.example.com/peers/peer0.org23.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org23.example.com/peers/peer0.org23.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org23.example.com:/var/hyperledger/production
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg18:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
+    depends_on:
+      - couchdborg18
+
+  couchdborg19:
+    container_name: couchdborg19
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
     ports:
-      - 10051:10051
+      - "16984:5984"
     networks:
       - test
 
-  peer0.org24.example.com:
-    container_name: peer0.org24.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
+  peer0.org19.example.com:
     environment:
-      - CORE_PEER_ID=peer0.org24.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:11051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org24.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:11051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:11051
-      - CORE_PEER_LOCALMSPID=Org24MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org24.example.com/peers/peer0.org24.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org24.example.com/peers/peer0.org24.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org24.example.com:/var/hyperledger/production
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg19:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
+    depends_on:
+      - couchdborg19
+
+  couchdborg20:
+    container_name: couchdborg20
+    image: hyperledger/fabric-couchdb
+    environment:
+      - COUCHDB_USER=
+      - COUCHDB_PASSWORD=
     ports:
-      - 11051:11051
+      - "17984:5984"
     networks:
       - test
 
-  peer0.org25.example.com:
-    container_name: peer0.org25.example.com
-    extends:
-      file: peer-base.yaml
-      service: peer-base
+  peer0.org20.example.com:
     environment:
-      - CORE_PEER_ID=peer0.org25.example.com
-      - CORE_PEER_ADDRESS=10.137.3.68:12051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:12051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org25.example.com:7052
-      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=10.137.3.68:12051
-      - CORE_PEER_GOSSIP_BOOTSTRAP=10.137.3.68:12051
-      - CORE_PEER_LOCALMSPID=Org25MSP
-    volumes:
-        - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org25.example.com/peers/peer0.org25.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org25.example.com/peers/peer0.org25.example.com/tls:/etc/hyperledger/fabric/tls
-        - peer0.org25.example.com:/var/hyperledger/production
-    ports:
-      - 12051:12051
-    networks:
-      - test
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdborg20:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=
+    depends_on:
+      - couchdborg20
+
 
