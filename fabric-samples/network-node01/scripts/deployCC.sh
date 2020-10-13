@@ -16,44 +16,44 @@ CC_SRC_LANGUAGE=`echo "$CC_SRC_LANGUAGE" | tr [:upper:] [:lower:]`
 FABRIC_CFG_PATH=$PWD/../configtx/
 
 if [ "$CC_SRC_LANGUAGE" = "go" -o "$CC_SRC_LANGUAGE" = "golang" ] ; then
-	CC_RUNTIME_LANGUAGE=golang
-	CC_SRC_PATH="../chaincode/fabcar/go/"
+  CC_RUNTIME_LANGUAGE=golang
+  CC_SRC_PATH="../chaincode/fabcar/go/"
 
-	echo Vendoring Go dependencies ...
-	pushd ../chaincode/fabcar/go
-	GO111MODULE=on go mod vendor
-	popd
-	echo Finished vendoring Go dependencies
+  echo Vendoring Go dependencies ...
+  pushd ../chaincode/fabcar/go
+  GO111MODULE=on go mod vendor
+  popd
+  echo Finished vendoring Go dependencies
 
 elif [ "$CC_SRC_LANGUAGE" = "javascript" ]; then
-	CC_RUNTIME_LANGUAGE=node # chaincode runtime language is node.js
-	CC_SRC_PATH="../chaincode/fabcar/javascript/"
+  CC_RUNTIME_LANGUAGE=node # chaincode runtime language is node.js
+  CC_SRC_PATH="../chaincode/fabcar/javascript/"
 
 elif [ "$CC_SRC_LANGUAGE" = "java" ]; then
-	CC_RUNTIME_LANGUAGE=java
-	CC_SRC_PATH="../chaincode/fabcar/java/build/install/fabcar"
+  CC_RUNTIME_LANGUAGE=java
+  CC_SRC_PATH="../chaincode/fabcar/java/build/install/fabcar"
 
-	echo Compiling Java code ...
-	pushd ../chaincode/fabcar/java
-	./gradlew installDist
-	popd
-	echo Finished compiling Java code
+  echo Compiling Java code ...
+  pushd ../chaincode/fabcar/java
+  ./gradlew installDist
+  popd
+  echo Finished compiling Java code
 
 elif [ "$CC_SRC_LANGUAGE" = "typescript" ]; then
-	CC_RUNTIME_LANGUAGE=node # chaincode runtime language is node.js
-	CC_SRC_PATH="../chaincode/fabcar/typescript/"
+  CC_RUNTIME_LANGUAGE=node # chaincode runtime language is node.js
+  CC_SRC_PATH="../chaincode/fabcar/typescript/"
 
-	echo Compiling TypeScript code into JavaScript ...
-	pushd ../chaincode/fabcar/typescript
-	npm install
-	npm run build
-	popd
-	echo Finished compiling TypeScript code into JavaScript
+  echo Compiling TypeScript code into JavaScript ...
+  pushd ../chaincode/fabcar/typescript
+  npm install
+  npm run build
+  popd
+  echo Finished compiling TypeScript code into JavaScript
 
 else
-	echo The chaincode language ${CC_SRC_LANGUAGE} is not supported by this script
-	echo Supported chaincode languages are: go, java, javascript, and typescript
-	exit 1
+  echo The chaincode language ${CC_SRC_LANGUAGE} is not supported by this script
+  echo Supported chaincode languages are: go, java, javascript, and typescript
+  exit 1
 fi
 
 # import utils
@@ -96,7 +96,7 @@ queryInstalled() {
   res=$?
   set +x
   cat log.txt
-	PACKAGE_ID=$(sed -n "/fabcar_${VERSION}/{s/^Package ID: //; s/, Label:.*$//; p;}" log.txt)
+  PACKAGE_ID=$(sed -n "/fabcar_${VERSION}/{s/^Package ID: //; s/, Label:.*$//; p;}" log.txt)
   verifyResult $res "Query installed on peer0.org${ORG} has failed"
   echo "===================== Query installed successful on peer0.org${ORG} on channel ===================== "
   echo
@@ -121,11 +121,11 @@ checkCommitReadiness() {
   shift 1
   setGlobals $ORG
   echo "===================== Checking the commit readiness of the chaincode definition on peer0.org${ORG} on channel '$CHANNEL_NAME'... ===================== "
-	local rc=1
-	local COUNTER=1
-	# continue to poll
+  local rc=1
+  local COUNTER=1
+  # continue to poll
   # we either get a successful response, or reach MAX RETRY
-	while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
+  while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
     sleep $DELAY
     echo "Attempting to check the commit readiness of the chaincode definition on peer0.org${ORG}, Retry after $DELAY seconds."
     set -x
@@ -137,8 +137,8 @@ checkCommitReadiness() {
     do
       grep "$var" log.txt &>/dev/null || let rc=1
     done
-		COUNTER=$(expr $COUNTER + 1)
-	done
+    COUNTER=$(expr $COUNTER + 1)
+  done
   cat log.txt
   if test $rc -eq 0; then
     echo "===================== Checking the commit readiness of the chaincode definition successful on peer0.org${ORG} on channel '$CHANNEL_NAME' ===================== "
@@ -174,26 +174,26 @@ queryCommitted() {
   setGlobals $ORG
   EXPECTED_RESULT="Version: ${VERSION}, Sequence: ${VERSION}, Endorsement Plugin: escc, Validation Plugin: vscc"
   echo "===================== Querying chaincode definition on peer0.org${ORG} on channel '$CHANNEL_NAME'... ===================== "
-	local rc=1
-	local COUNTER=1
-	# continue to poll
+  local rc=1
+  local COUNTER=1
+  # continue to poll
   # we either get a successful response, or reach MAX RETRY
-	while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
+  while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
     sleep $DELAY
     echo "Attempting to Query committed status on peer0.org${ORG}, Retry after $DELAY seconds."
     set -x
     peer lifecycle chaincode querycommitted --channelID $CHANNEL_NAME --name fabcar >&log.txt
     res=$?
     set +x
-		test $res -eq 0 && VALUE=$(cat log.txt | grep -o '^Version: [0-9], Sequence: [0-9], Endorsement Plugin: escc, Validation Plugin: vscc')
+    test $res -eq 0 && VALUE=$(cat log.txt | grep -o '^Version: [0-9], Sequence: [0-9], Endorsement Plugin: escc, Validation Plugin: vscc')
     test "$VALUE" = "$EXPECTED_RESULT" && let rc=0
-		COUNTER=$(expr $COUNTER + 1)
-	done
+    COUNTER=$(expr $COUNTER + 1)
+  done
   echo
   cat log.txt
   if test $rc -eq 0; then
     echo "===================== Query chaincode definition successful on peer0.org${ORG} on channel '$CHANNEL_NAME' ===================== "
-		echo
+    echo
   else
     echo "!!!!!!!!!!!!!!! After $MAX_RETRY attempts, Query chaincode definition result on peer0.org${ORG} is INVALID !!!!!!!!!!!!!!!!"
     echo
@@ -223,25 +223,25 @@ chaincodeQuery() {
   ORG=$1
   setGlobals $ORG
   echo "===================== Querying on peer0.org${ORG} on channel '$CHANNEL_NAME'... ===================== "
-	local rc=1
-	local COUNTER=1
-	# continue to poll
+  local rc=1
+  local COUNTER=1
+  # continue to poll
   # we either get a successful response, or reach MAX RETRY
-	while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
+  while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
     sleep $DELAY
     echo "Attempting to Query peer0.org${ORG}, Retry after $DELAY seconds."
     set -x
     peer chaincode query -C $CHANNEL_NAME -n fabcar -c '{"Args":["queryAllCars"]}' >&log.txt
     res=$?
     set +x
-		let rc=$res
-		COUNTER=$(expr $COUNTER + 1)
-	done
+    let rc=$res
+    COUNTER=$(expr $COUNTER + 1)
+  done
   echo
   cat log.txt
   if test $rc -eq 0; then
     echo "===================== Query successful on peer0.org${ORG} on channel '$CHANNEL_NAME' ===================== "
-		echo
+    echo
   else
     echo "!!!!!!!!!!!!!!! After $MAX_RETRY attempts, Query result on peer0.org${ORG} is INVALID !!!!!!!!!!!!!!!!"
     echo
@@ -249,7 +249,7 @@ chaincodeQuery() {
   fi
 }
 
-SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member','Org11MSP.member','Org12MSP.member','Org13MSP.member','Org14MSP.member','Org15MSP.member','Org16MSP.member','Org17MSP.member','Org18MSP.member','Org19MSP.member','Org20MSP.member','Org21MSP.member','Org22MSP.member','Org23MSP.member','Org24MSP.member','Org25MSP.member','Org26MSP.member','Org27MSP.member','Org28MSP.member','Org29MSP.member','Org30MSP.member','Org31MSP.member','Org32MSP.member','Org33MSP.member','Org34MSP.member','Org35MSP.member','Org36MSP.member','Org37MSP.member','Org38MSP.member','Org39MSP.member','Org40MSP.member','Org41MSP.member','Org42MSP.member','Org43MSP.member','Org44MSP.member','Org45MSP.member','Org46MSP.member','Org47MSP.member','Org48MSP.member','Org49MSP.member','Org50MSP.member')"
+SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member','Org6MSP.member','Org7MSP.member','Org8MSP.member','Org9MSP.member','Org10MSP.member','Org11MSP.member','Org12MSP.member','Org13MSP.member','Org14MSP.member','Org15MSP.member','Org16MSP.member','Org17MSP.member','Org18MSP.member','Org19MSP.member','Org20MSP.member','Org21MSP.member','Org22MSP.member','Org23MSP.member','Org24MSP.member','Org25MSP.member','Org26MSP.member','Org27MSP.member','Org28MSP.member','Org29MSP.member','Org30MSP.member','Org31MSP.member','Org32MSP.member','Org33MSP.member','Org34MSP.member','Org35MSP.member','Org36MSP.member','Org37MSP.member','Org38MSP.member','Org39MSP.member','Org40MSP.member')"
 
 ## at first we package the chaincode
 packageChaincode 1
@@ -296,16 +296,6 @@ installChaincode 37
 installChaincode 38
 installChaincode 39
 installChaincode 40
-installChaincode 41
-installChaincode 42
-installChaincode 43
-installChaincode 44
-installChaincode 45
-installChaincode 46
-installChaincode 47
-installChaincode 48
-installChaincode 49
-installChaincode 50
 
 ## query whether the chaincode is installed
 queryInstalled 1
@@ -391,29 +381,9 @@ approveForMyOrg 39
 checkCommitReadiness 39 "\"Org39MSP\": true"
 approveForMyOrg 40
 checkCommitReadiness 40 "\"Org40MSP\": true"
-approveForMyOrg 41
-checkCommitReadiness 41 "\"Org41MSP\": true"
-approveForMyOrg 42
-checkCommitReadiness 42 "\"Org42MSP\": true"
-approveForMyOrg 43
-checkCommitReadiness 43 "\"Org43MSP\": true"
-approveForMyOrg 44
-checkCommitReadiness 44 "\"Org44MSP\": true"
-approveForMyOrg 45
-checkCommitReadiness 45 "\"Org45MSP\": true"
-approveForMyOrg 46
-checkCommitReadiness 46 "\"Org46MSP\": true"
-approveForMyOrg 47
-checkCommitReadiness 47 "\"Org47MSP\": true"
-approveForMyOrg 48
-checkCommitReadiness 48 "\"Org48MSP\": true"
-approveForMyOrg 49
-checkCommitReadiness 49 "\"Org49MSP\": true"
-approveForMyOrg 50
-checkCommitReadiness 50 "\"Org50MSP\": true"
 
 ## now that we know for sure both orgs have approved, commit the definition
-commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50
+commitChaincodeDefinition 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
 
 ## query on both orgs to see that the definition committed successfully
 queryCommitted 1
@@ -456,19 +426,9 @@ queryCommitted 37
 queryCommitted 38
 queryCommitted 39
 queryCommitted 40
-queryCommitted 41
-queryCommitted 42
-queryCommitted 43
-queryCommitted 44
-queryCommitted 45
-queryCommitted 46
-queryCommitted 47
-queryCommitted 48
-queryCommitted 49
-queryCommitted 50
 
 ## Invoke the chaincode
-chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50
+chaincodeInvokeInit 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
 
 sleep 10
 
