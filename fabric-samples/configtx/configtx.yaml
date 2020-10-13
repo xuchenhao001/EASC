@@ -133,7 +133,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org6MSP.peer')"
         AnchorPeers:
-            - Host: *Node01Addr
+            - Host: &Node02Addr 10.137.3.71
               Port: 13051
     - &Org7
         Name: Org7MSP
@@ -153,7 +153,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org7MSP.peer')"
         AnchorPeers:
-            - Host: *Node01Addr
+            - Host: *Node02Addr
               Port: 14051
     - &Org8
         Name: Org8MSP
@@ -173,7 +173,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org8MSP.peer')"
         AnchorPeers:
-            - Host: *Node01Addr
+            - Host: *Node02Addr
               Port: 15051
     - &Org9
         Name: Org9MSP
@@ -193,7 +193,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org9MSP.peer')"
         AnchorPeers:
-            - Host: *Node01Addr
+            - Host: *Node02Addr
               Port: 16051
     - &Org10
         Name: Org10MSP
@@ -213,7 +213,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org10MSP.peer')"
         AnchorPeers:
-            - Host: *Node01Addr
+            - Host: *Node02Addr
               Port: 17051
     - &Org11
         Name: Org11MSP
@@ -233,7 +233,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org11MSP.peer')"
         AnchorPeers:
-            - Host: &Node02Addr 10.137.3.71
+            - Host: &Node03Addr 10.137.3.68
               Port: 7051
     - &Org12
         Name: Org12MSP
@@ -253,7 +253,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org12MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node03Addr
               Port: 9051
     - &Org13
         Name: Org13MSP
@@ -273,7 +273,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org13MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node03Addr
               Port: 10051
     - &Org14
         Name: Org14MSP
@@ -293,7 +293,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org14MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node03Addr
               Port: 11051
     - &Org15
         Name: Org15MSP
@@ -313,7 +313,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org15MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node03Addr
               Port: 12051
     - &Org16
         Name: Org16MSP
@@ -333,7 +333,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org16MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: &Node04Addr 10.137.3.20
               Port: 13051
     - &Org17
         Name: Org17MSP
@@ -353,7 +353,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org17MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node04Addr
               Port: 14051
     - &Org18
         Name: Org18MSP
@@ -373,7 +373,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org18MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node04Addr
               Port: 15051
     - &Org19
         Name: Org19MSP
@@ -393,7 +393,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org19MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node04Addr
               Port: 16051
     - &Org20
         Name: Org20MSP
@@ -413,7 +413,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org20MSP.peer')"
         AnchorPeers:
-            - Host: *Node02Addr
+            - Host: *Node04Addr
               Port: 17051
     - &Org21
         Name: Org21MSP
@@ -433,7 +433,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org21MSP.peer')"
         AnchorPeers:
-            - Host: &Node03Addr 10.137.3.68
+            - Host: &Node05Addr 10.137.3.69
               Port: 7051
     - &Org22
         Name: Org22MSP
@@ -453,7 +453,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org22MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node05Addr
               Port: 9051
     - &Org23
         Name: Org23MSP
@@ -473,7 +473,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org23MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node05Addr
               Port: 10051
     - &Org24
         Name: Org24MSP
@@ -493,7 +493,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org24MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node05Addr
               Port: 11051
     - &Org25
         Name: Org25MSP
@@ -513,7 +513,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org25MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node05Addr
               Port: 12051
     - &Org26
         Name: Org26MSP
@@ -533,7 +533,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org26MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: &Node06Addr 10.137.3.6
               Port: 13051
     - &Org27
         Name: Org27MSP
@@ -553,7 +553,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org27MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node06Addr
               Port: 14051
     - &Org28
         Name: Org28MSP
@@ -573,7 +573,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org28MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node06Addr
               Port: 15051
     - &Org29
         Name: Org29MSP
@@ -593,7 +593,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org29MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node06Addr
               Port: 16051
     - &Org30
         Name: Org30MSP
@@ -613,7 +613,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org30MSP.peer')"
         AnchorPeers:
-            - Host: *Node03Addr
+            - Host: *Node06Addr
               Port: 17051
     - &Org31
         Name: Org31MSP
@@ -633,7 +633,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org31MSP.peer')"
         AnchorPeers:
-            - Host: &Node04Addr 10.137.3.20
+            - Host: &Node07Addr 10.137.3.23
               Port: 7051
     - &Org32
         Name: Org32MSP
@@ -653,7 +653,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org32MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node07Addr
               Port: 9051
     - &Org33
         Name: Org33MSP
@@ -673,7 +673,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org33MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node07Addr
               Port: 10051
     - &Org34
         Name: Org34MSP
@@ -693,7 +693,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org34MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node07Addr
               Port: 11051
     - &Org35
         Name: Org35MSP
@@ -713,7 +713,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org35MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node07Addr
               Port: 12051
     - &Org36
         Name: Org36MSP
@@ -733,7 +733,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org36MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: &Node08Addr 10.137.3.90
               Port: 13051
     - &Org37
         Name: Org37MSP
@@ -753,7 +753,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org37MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node08Addr
               Port: 14051
     - &Org38
         Name: Org38MSP
@@ -773,7 +773,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org38MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node08Addr
               Port: 15051
     - &Org39
         Name: Org39MSP
@@ -793,7 +793,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org39MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node08Addr
               Port: 16051
     - &Org40
         Name: Org40MSP
@@ -813,7 +813,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org40MSP.peer')"
         AnchorPeers:
-            - Host: *Node04Addr
+            - Host: *Node08Addr
               Port: 17051
     - &Org41
         Name: Org41MSP
@@ -833,7 +833,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org41MSP.peer')"
         AnchorPeers:
-            - Host: &Node05Addr 10.137.3.69
+            - Host: &Node09Addr 10.137.3.91
               Port: 7051
     - &Org42
         Name: Org42MSP
@@ -853,7 +853,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org42MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node09Addr
               Port: 9051
     - &Org43
         Name: Org43MSP
@@ -873,7 +873,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org43MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node09Addr
               Port: 10051
     - &Org44
         Name: Org44MSP
@@ -893,7 +893,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org44MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node09Addr
               Port: 11051
     - &Org45
         Name: Org45MSP
@@ -913,7 +913,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org45MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node09Addr
               Port: 12051
     - &Org46
         Name: Org46MSP
@@ -933,7 +933,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org46MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: &Node10Addr 10.137.3.88
               Port: 13051
     - &Org47
         Name: Org47MSP
@@ -953,7 +953,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org47MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node10Addr
               Port: 14051
     - &Org48
         Name: Org48MSP
@@ -973,7 +973,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org48MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node10Addr
               Port: 15051
     - &Org49
         Name: Org49MSP
@@ -993,7 +993,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org49MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node10Addr
               Port: 16051
     - &Org50
         Name: Org50MSP
@@ -1013,7 +1013,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org50MSP.peer')"
         AnchorPeers:
-            - Host: *Node05Addr
+            - Host: *Node10Addr
               Port: 17051
 
 Capabilities:
