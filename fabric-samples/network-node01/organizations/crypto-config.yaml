@@ -6,6 +6,7 @@ OrdererOrgs:
       - Hostname: orderer
         SANS:
           - localhost
+          - 10.137.3.70
 PeerOrgs:
   - Name: Org1
     Domain: org1.example.com
