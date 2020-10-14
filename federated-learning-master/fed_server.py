@@ -16,7 +16,7 @@ from threading import Thread
 from torchvision import datasets, transforms
 import torch
 
-from utils.sampling import mnist_iid, mnist_noniid, cifar_iid
+from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, noniid_onepass
 from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
@@ -25,19 +25,27 @@ from models.test import test_img
 
 from tornado import gen, httpclient, ioloop, web
 
+np.random.seed(0)
+
+user_number = 10
 url = "http://localhost:3000/invoke/mychannel/fabcar"
 # url = "http://localhost:3000/test/echo"
-total_epochs = 0
+total_epochs = 50
 args = None
 net_glob = None
 dataset_train = None
 dataset_test = None
 dict_users = None
 idxs_users = None
-user_number = 2
 check_train_ready_map = {}
 check_negotiate_ready_map = {}
 lock = threading.Lock()
+train_users = None
+test_users = None
+skew_users1 = None
+skew_users2 = None
+skew_users3 = None
+skew_users4 = None
 
 
 def test(data):
@@ -71,11 +79,15 @@ async def prepare():
     global dataset_test
     global dict_users
     global idxs_users
-    global total_epochs
+    global train_users
+    global test_users
+    global skew_users1
+    global skew_users2
+    global skew_users3
+    global skew_users4
     # parse args
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
-    total_epochs = args.epochs
 
     # load dataset and split users
     if args.dataset == 'mnist':
@@ -88,7 +100,10 @@ async def prepare():
             dict_users = mnist_iid(dataset_train, args.num_users)
         else:
             # dict_users = mnist_noniid(dataset_train, 1)
-            dict_users = mnist_noniid(dataset_train, args.num_users)
+            # dict_users = mnist_noniid(dataset_train, args.num_users)
+            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
+                                                                                                        dataset_test,
+                                                                                                        args.num_users)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -98,7 +113,10 @@ async def prepare():
             # dict_users = cifar_iid(dataset_train, 1)
             dict_users = cifar_iid(dataset_train, args.num_users)
         else:
-            exit('Error: only consider IID setting in CIFAR10')
+            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
+                                                                                                        dataset_test,
+                                                                                                        args.num_users)
+            # exit('Error: only consider IID setting in CIFAR10')
     else:
         exit('Error: unrecognized dataset')
     img_size = dataset_train[0][0].shape
@@ -146,9 +164,10 @@ async def train(data, uuid, epochs, start_time):
     w_glob = data.get("w_glob")
     conver_json_value_to_tensor(w_glob)
     net_glob.load_state_dict(w_glob)
-    # local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[0])
-    idx = idxs_users[randrange(int(args.frac * args.num_users))]  # random select one for each round
+
+    idx = int(uuid)
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
+
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
     convert_tensor_value_to_numpy(w)
     body_data = {
@@ -250,7 +269,8 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
         net_glob.load_state_dict(w_local2)
         net_glob.eval()
         # test the accuracy
-        acc_test, loss_test = test_img(net_glob, dataset_test, args)
+        idx = int(my_uuid)
+        acc_test, loss_test = test_img(net_glob, dataset_test, args, idx=test_users[idx])
         alpha_list.append(alpha)
         acc_test_list.append(acc_test.numpy().item(0))
         print("myuuid: " + my_uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
@@ -382,3 +402,4 @@ if __name__ == "__main__":
     app.listen(8888)
     print("start serving at 8888...")
     ioloop.IOLoop.current().start()
+
