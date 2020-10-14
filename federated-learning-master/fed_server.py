@@ -28,8 +28,7 @@ from tornado import gen, httpclient, ioloop, web
 np.random.seed(0)
 
 user_number = 10
-url = "http://localhost:3000/invoke/mychannel/fabcar"
-# url = "http://localhost:3000/test/echo"
+url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
 total_epochs = 50
 args = None
 net_glob = None
