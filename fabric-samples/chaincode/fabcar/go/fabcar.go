@@ -27,6 +27,8 @@ type HttpMessage struct {
 	Uuid string `json:"uuid"`
 	Epochs int `json:"epochs"`
 	StartTime float64 `json:"start_time"`
+	TrainTime float64 `json:"train_time"`
+	TestTime float64 `json:"test_time"`
 }
 
 type HttpAccAlphaMessage struct {
@@ -35,6 +37,8 @@ type HttpAccAlphaMessage struct {
 	Uuid string `json:"uuid"`
 	Epochs int `json:"epochs"`
 	StartTime float64 `json:"start_time"`
+	TrainTime float64 `json:"train_time"`
+	TestTime float64 `json:"test_time"`
 }
 
 type AccAlpha struct {
@@ -168,6 +172,8 @@ func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, 
 		sendMsg.Uuid = myuuid
 		sendMsg.Epochs = recMsg.Epochs
 		sendMsg.StartTime = recMsg.StartTime
+		sendMsg.TrainTime = recMsg.TrainTime
+		sendMsg.TestTime = recMsg.TestTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 		go sendPostRequest(sendMsgAsBytes, "TRAIN")
 	} else {
@@ -234,7 +240,7 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 	// (findMaxAccAvg or findMinAccVar), release alpha and w
 	if len(accAlphaMap) == userNum {
 		fmt.Println("gathered enough acc_test and alpha, choose the best alpha according to the policy")
-		alpha := findMaxAccAvg(accAlphaMap)
+		alpha, acc := findMaxAccAvg(accAlphaMap)
 		// load w from db
 		wMap, err := readAsMap(ctx, "wMap", recMsg.Epochs)
 		if err != nil {
@@ -248,6 +254,7 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 		// release alpha and w
 		data := make(map[string]interface{})
 		data["alpha"] = alpha // alpha is included in data
+		data["accuracy"] = acc // accuracy for alpha is included in data
 		data["wMap"] = wMap // w map is included in data, the keys are uuids of users
 		data["wGlobMap"] = wGlobMap // w_glob map is also included in data, the keys are uuids of users
 		sendMsg := new(HttpMessage)
@@ -256,6 +263,8 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 		sendMsg.Uuid = myuuid
 		sendMsg.Epochs = recMsg.Epochs
 		sendMsg.StartTime = recMsg.StartTime
+		sendMsg.TrainTime = recMsg.TrainTime
+		sendMsg.TestTime = recMsg.TestTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 
 		go sendPostRequest(sendMsgAsBytes, "NEGOTIATE")
@@ -267,7 +276,7 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 }
 
 // sub-functions for STEP#6: find out the max acc_test average
-func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
+func findMaxAccAvg(accAlphaMap map[string]AccAlpha) (float64, float64) {
 	fmt.Println("[Find Alpha] According to max acc_test average policy")
 	accTestSum :=make([]float64, negotiateRound)
 	var randomUuid string
@@ -290,7 +299,7 @@ func findMaxAccAvg(accAlphaMap map[string]AccAlpha) float64 {
 	alpha := accAlphaMap[randomUuid].Alpha[maxIndex]
 	acc := max/float64(userNum)
 	fmt.Println("Found the max acc_test: ", acc, " with alpha: ", alpha)
-	return alpha
+	return alpha, acc
 }
 
 // sub-functions for STEP#6: find out the min acc_test variance
@@ -353,3 +362,4 @@ func main() {
 		fmt.Printf("Error starting chaincode: %s", err.Error())
 	}
 }
+
