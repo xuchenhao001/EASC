@@ -227,7 +227,7 @@ function releaseCerts() {
     index=$(printf "%02d" $((i+2)))
     scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-20-peers/network-node${index}/peerOrganizations.tar.gz
     ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-20-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
-    ssh ubuntu@${AllNodesAddrs[$i]} "nohup python3 -u ~/EASC/federated-learning-master/fed_server.py > server_${AllNodesAddrs[$i]}.log 2>&1 &"
+    ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
   done
   rm -f peerOrganizations.tar.gz
 }
