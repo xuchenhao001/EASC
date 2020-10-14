@@ -97,13 +97,11 @@ def init():
         # sample users
         if args.iid:
             # dict_users = mnist_iid(dataset_train, 1)
-            dict_users = mnist_iid(dataset_train, args.num_users)
+            dict_users = mnist_iid(dataset_train, user_number)
         else:
-            # dict_users = mnist_noniid(dataset_train, 1)
-            # dict_users = mnist_noniid(dataset_train, args.num_users)
             dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
                                                                                                         dataset_test,
-                                                                                                        args.num_users)
+                                                                                                        user_number)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -111,18 +109,18 @@ def init():
         dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
         if args.iid:
             # dict_users = cifar_iid(dataset_train, 1)
-            dict_users = cifar_iid(dataset_train, args.num_users)
+            dict_users = cifar_iid(dataset_train, user_number)
         else:
             dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
                                                                                                         dataset_test,
-                                                                                                        args.num_users)
+                                                                                                        user_number)
             # exit('Error: only consider IID setting in CIFAR10')
     else:
         exit('Error: unrecognized dataset')
     img_size = dataset_train[0][0].shape
 
-    m = max(int(args.frac * args.num_users), 1)
-    idxs_users = np.random.choice(range(args.num_users), m, replace=False)
+    m = max(int(args.frac * user_number), 1)
+    idxs_users = np.random.choice(range(user_number), m, replace=False)
 
     # build model, init part
     if args.model == 'cnn' and args.dataset == 'cifar':
