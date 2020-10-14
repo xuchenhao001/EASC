@@ -282,6 +282,7 @@ function createOrgs() {
   echo
   echo "Generate CCP files for Org1 and Org2"
   ./organizations/ccp-generate.sh
+  cp organizations/peerOrganizations/org1.example.com/connection-org1.json ../../blockchain-server/routes/rest/wallet/connection-org1.json
 }
 
 # Once you create the organization crypto material, you need to create the
