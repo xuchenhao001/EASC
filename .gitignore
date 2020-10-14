@@ -6,4 +6,5 @@ vendor/
 config/
 wallet/
 result-record_*
-
+output/
+*.log
