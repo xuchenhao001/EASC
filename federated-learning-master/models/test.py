@@ -6,14 +6,15 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from models.Update import DatasetSplit
 
 
-def test_img(net_g, datatest, args):
+def test_img(net_g, datatest, args, idx=None):
     net_g.eval()
     # testing
     test_loss = 0
     correct = 0
-    data_loader = DataLoader(datatest, batch_size=args.bs)
+    data_loader = DataLoader(DatasetSplit(datatest, idx), batch_size=args.bs)
     l = len(data_loader)
     for idx, (data, target) in enumerate(data_loader):
         if args.gpu != -1:
@@ -32,3 +33,35 @@ def test_img(net_g, datatest, args):
             test_loss, correct, len(data_loader.dataset), accuracy))
     return accuracy, test_loss
 
+
+def test_img_idx(net_g, dataset_test, idx, args):
+    net_g.eval()
+
+    test_loss = 0
+    correct = 0
+
+    dataset = DatasetSplit(dataset_test, idx)
+    data_loader = DataLoader(dataset, batch_size=args.bs)
+
+    y_target = []
+    y_pred = []
+    for idx, (data, target) in enumerate(data_loader):
+        if args.gpu != -1:
+            data, target = data.to(args.device), target.to(args.device)
+        log_probs = net_g(data)
+        y_target.append(target)
+        pred = log_probs.data.max(1, keepdim=True)[1]
+        y_pred.append(pred)
+
+    y_target = torch.cat(y_target)
+    y_pred = torch.cat(y_pred)
+    y_pred = y_pred.squeeze(1)
+
+    for i in range(len(idx_list)):
+        correct[i] = sum(y_target[subset_idx[i]:subset_idx[i + 1]] == y_pred[subset_idx[i]:subset_idx[i + 1]])
+    correct = sum(y_target[subset_idx[i]:subset_idx[i + 1]] == y_pred[subset_idx[i]:subset_idx[i + 1]])
+
+    test_loss /= len(data_loader.dataset)
+    accuracy = 100.00 * correct / len(data_loader.dataset)
+
+    return correct

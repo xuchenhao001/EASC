@@ -48,6 +48,54 @@ def mnist_noniid(dataset, num_users):
     return dict_users
 
 
+
+def get_indices(labels, user_labels, n_samples):
+    indices = []
+    for selected_label in user_labels:
+        label_samples = np.where(labels[1,:] == selected_label)
+        label_indices = labels[0, label_samples]
+        selected_indices = list(np.random.choice(label_indices[0], n_samples, replace=False))
+        indices += selected_indices
+    return indices
+
+def noniid_onepass(dataset_train, dataset_test, num_users, kept_class=4):
+    train_users = {}
+    test_users = {}
+    skew_users1 = {}
+    skew_users2 = {}
+    skew_users3 = {}
+    skew_users4 = {}
+
+    train_idxs = np.arange(len(dataset_train))
+    train_labels = dataset_train.targets
+    train_labels = np.vstack((train_idxs, train_labels))
+    train_labels = train_labels[:, train_labels[1,:].argsort()]
+
+    test_idxs = np.arange(len(dataset_test))
+    test_labels = dataset_test.targets
+    test_labels = np.vstack((test_idxs, test_labels))
+    test_labels = test_labels[:, test_labels[1,:].argsort()]
+
+    labels = list(range(10))
+    for i in range(num_users):
+        user_labels = np.random.choice(labels, size=4, replace=False)
+        skew_labels = [i for i in labels if i not in user_labels]
+        train_indices = get_indices(train_labels, user_labels, n_samples=150)
+        test_indices = get_indices(test_labels, user_labels, n_samples=50)
+        skew_indices1 = get_indices(test_labels, skew_labels, n_samples=5)
+        skew_indices2 = get_indices(test_labels, skew_labels, n_samples=15)
+        skew_indices3 = get_indices(test_labels, skew_labels, n_samples=20)
+        skew_indices4 = get_indices(test_labels, skew_labels, n_samples=25)
+
+        train_users[i] = train_indices
+        test_users[i] = test_indices
+        skew_users1[i] = skew_indices1
+        skew_users2[i] = skew_indices2
+        skew_users3[i] = skew_indices3
+        skew_users4[i] = skew_indices4
+    return train_users, test_users, skew_users1,skew_users2,skew_users3,skew_users4
+
+
 def cifar_iid(dataset, num_users):
     """
     Sample I.I.D. client data from CIFAR10 dataset
