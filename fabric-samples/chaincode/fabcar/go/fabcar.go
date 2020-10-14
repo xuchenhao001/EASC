@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 )
 
 const url = "http://172.17.0.1:8888/messages"
@@ -43,7 +44,9 @@ type AccAlpha struct {
 
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
 	// generate a new uuid for each user
-	myuuid = uuid.Must(uuid.NewRandom()).String()
+	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
+	println("LOCALMSPID: " + localMSPID)
+	myuuid = strings.Trim(localMSPID, "OrgMSP")
 	println("Init finished. My uuid: " + myuuid)
 	return nil
 }
