@@ -160,6 +160,7 @@ function createOrgs() {
   echo
   echo "Generate CCP files for Orgs"
   ./organizations/ccp-generate.sh
+  cp organizations/peerOrganizations/org1.example.com/connection-org1.json ../../blockchain-server/routes/rest/wallet/connection-org1.json
 }
 
 # Generate orderer system channel genesis block.

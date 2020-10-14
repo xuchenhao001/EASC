@@ -160,6 +160,7 @@ function createOrgs() {
   echo
   echo "Generate CCP files for Orgs"
   ./organizations/ccp-generate.sh
+  cp organizations/peerOrganizations/org1.example.com/connection-org1.json ../../blockchain-server/routes/rest/wallet/connection-org1.json
 }
 
 # Generate orderer system channel genesis block.
@@ -221,7 +222,7 @@ function networkUp() {
 function releaseCerts() {
   tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
   cd ~/EASC/federated-learning-master/
-  nohup python3 -u fed_server.py > server_${AllNodesAddrs[$i]}.log 2>&1 &
+  nohup python3 -u fed_server.py > server_10.137.3.70.log 2>&1 &
   cd -
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
