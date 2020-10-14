@@ -70,9 +70,9 @@ def http_client_post(json_body, message="None"):
         return None
 
 
-# STEP #1
+# STEP #1.1
 # Federated Learning: init step
-async def prepare():
+def init():
     global args
     global net_glob
     global dataset_train
@@ -137,9 +137,13 @@ async def prepare():
     else:
         exit('Error: unrecognized model')
     print(net_glob)
-    net_glob.train()  # one node do this
+    net_glob.train()
+
+
+# STEP #1.2
+async def prepare():
     # copy weights
-    w_glob = net_glob.state_dict() # change model to parameters
+    w_glob = net_glob.state_dict()  # change model to parameters
     # upload w_glob onto blockchian
     convert_tensor_value_to_numpy(w_glob)
     print("\n\n##### Epoch #", total_epochs, " start now. #####\n")
@@ -150,6 +154,8 @@ async def prepare():
             'user_number': user_number,
         },
         'start_time': time.time(),
+        'train_time': 0,
+        'test_time': 0,
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -167,8 +173,9 @@ async def train(data, uuid, epochs, start_time):
 
     idx = int(uuid)
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
-
+    train_start_time = time.time()
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+    train_time = time.time() - train_start_time
     convert_tensor_value_to_numpy(w)
     body_data = {
         'message': 'train',
@@ -178,6 +185,8 @@ async def train(data, uuid, epochs, start_time):
         'uuid': uuid,
         'epochs': epochs,
         'start_time': start_time,
+        'train_time': train_time,
+        'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'train')
@@ -190,6 +199,8 @@ async def train(data, uuid, epochs, start_time):
             'message': 'train_ready',
             'epochs': epochs,
             'start_time': start_time,
+            'train_time': train_time,
+            'test_time': 0,
         }
         json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
         response = await http_client_post(json_body, 'train_ready')
@@ -202,7 +213,7 @@ async def train(data, uuid, epochs, start_time):
 
 # STEP #4
 # Federated Learning: average w for w_glob
-async def average(w_map, uuid, epochs, start_time):
+async def average(w_map, uuid, epochs, start_time, train_time):
     print('received average request.')
     wArray = []
     for i in w_map.keys():
@@ -222,35 +233,39 @@ async def average(w_map, uuid, epochs, start_time):
         'uuid': uuid,
         'epochs': epochs,
         'start_time': start_time,
+        'train_time': train_time,
+        'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(json_body, 'w_glob')
     print(response)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, start_time)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, start_time, train_time)
     thread_negotiate.start()
 
 
 # STEP #5
 # Federated Learning: negotiate and test accuracy, upload to blockchain
 class myNegotiateThread(Thread):
-    def __init__(self, my_uuid, w_glob, w_local, epochs, start_time):
+    def __init__(self, my_uuid, w_glob, w_local, epochs, start_time, train_time):
         Thread.__init__(self)
         self.my_uuid = my_uuid
         self.w_glob = w_glob
         self.w_local = w_local
         self.epochs = epochs
         self.start_time = start_time
+        self.train_time = train_time
 
     def run(self):
         print("start my negotiate thread: " + self.my_uuid)
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.start_time))
+        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.start_time,
+                                          self.train_time))
         # negotiate(self.my_uuid, self.w_glob, self.w_local)
         print("end my negotiate thread: " + self.my_uuid)
 
 
-async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
+async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
     print("start negotiate for user: " + my_uuid)
     hyperpara_min = 0.5
     hyperpara_max = 0.8
@@ -260,6 +275,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
     negotiate_step_list = np.arange(hyperpara_min, hyperpara_max, negotiate_step)
     alpha_list = []
     acc_test_list = []
+    test_start_time = time.time()
     for alpha in negotiate_step_list:
         w_local2 = {}
         for key in w_glob.keys():
@@ -275,6 +291,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
         acc_test_list.append(acc_test.numpy().item(0))
         print("myuuid: " + my_uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
 
+    test_time = time.time() - test_start_time
     # send acc_test_list and alpha_list to smart contract
     body_data = {
         'message': 'negotiate',
@@ -285,6 +302,8 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
         'uuid': my_uuid,
         'epochs': epochs,
         'start_time': start_time,
+        'train_time': train_time,
+        'test_time': test_time,
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -298,6 +317,8 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
             'message': 'negotiate_ready',
             'epochs': epochs,
             'start_time': start_time,
+            'train_time': train_time,
+            'test_time': test_time,
         }
         json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
         response = await http_client_post(json_body, 'negotiate_ready')
@@ -310,9 +331,10 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time):
 
 # STEP #7
 # Federated Learning: with new alpha, train w_local2, restart the round
-async def next_round(data, uuid, epochs, start_time):
+async def next_round(data, uuid, epochs, start_time, train_time, test_time):
     print('received alpha, train new w_glob for uuid: ' + uuid)
     alpha = data.get("alpha")
+    accuracy = data.get("accuracy")
     w_map = data.get("wMap")
     w_glob_map = data.get("wGlobMap")
     print(w_map.keys())
@@ -333,9 +355,17 @@ async def next_round(data, uuid, epochs, start_time):
     # epochs count backwards until 0
     new_epochs = epochs - 1
     # before start next round, record the time
-    with open("time-record_" + uuid + ".txt", "a") as time_record_file:
+    with open("result-record_" + uuid + ".txt", "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())
-        time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "] " + str(time.time() - start_time) + "\n")
+        total_time = time.time()-start_time
+        communication_time = total_time - train_time - test_time
+        time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "]"
+                               + " <Total Time> " + str(total_time)[:8]
+                               + " <Train Time> " + str(train_time)[:8]
+                               + " <Test Time> " + str(test_time)[:8]
+                               + " <Communication Time> " + str(communication_time)[:8]
+                               + " <Accuracy> " + str(accuracy)[:8]
+                               + "\n")
     if new_epochs > 0:
         print("##### Epoch #", new_epochs, " start now. #####")
         # reset a new time for next round
@@ -386,9 +416,11 @@ class MainHandler(web.RequestHandler):
         elif message == "prepare":
             await train(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
         elif message == "average":
-            await average(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
+            await average(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"),
+                          data.get("train_time"))
         elif message == "alpha":
-            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
+            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"),
+                             data.get("train_time"), data.get("test_time"))
 
 
 def make_app():
@@ -398,6 +430,7 @@ def make_app():
 
 
 if __name__ == "__main__":
+    init()
     app = make_app()
     app.listen(8888)
     print("start serving at 8888...")
