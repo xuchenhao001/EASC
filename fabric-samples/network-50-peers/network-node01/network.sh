@@ -147,6 +147,14 @@ function createOrgs() {
       fatalln "Failed to generate certificates..."
     fi
 
+    CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem)
+    CERT=$(echo $CERT | sed 's/\//\\\//g')
+    PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/priv_sk)
+    PRIK=$(echo $PRIK | sed 's/\//\\\//g')
+    sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" ./organizations/wallet-template.json > appUser.id
+    mkdir -p ../../../blockchain-server/routes/rest/wallet/
+    mv appUser.id ../../../blockchain-server/routes/rest/wallet/
+
   fi
 
   echo
