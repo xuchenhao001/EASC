@@ -30,7 +30,7 @@ np.random.seed(0)
 user_number = 2
 url = "http://localhost:3000/invoke/mychannel/fabcar"
 # url = "http://localhost:3000/test/echo"
-total_epochs = 0
+total_epochs = 50
 args = None
 net_glob = None
 dataset_train = None
@@ -79,7 +79,6 @@ async def prepare():
     global dataset_test
     global dict_users
     global idxs_users
-    global total_epochs
     global train_users
     global test_users
     global skew_users1
@@ -89,7 +88,6 @@ async def prepare():
     # parse args
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
-    total_epochs = args.epochs
 
     # load dataset and split users
     if args.dataset == 'mnist':
