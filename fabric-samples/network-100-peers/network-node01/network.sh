@@ -222,8 +222,9 @@ function releaseCerts() {
   tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-100-peers/network-node${index}/peerOrganizations.tar.gz
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-100-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+    # scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-10-peers/network-node${index}/peerOrganizations.tar.gz
+    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh up"
   done
   rm -f peerOrganizations.tar.gz
 }
@@ -274,7 +275,8 @@ function networkDown() {
 
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-100-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
+    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh down"
   done
 }
 
