@@ -29,7 +29,7 @@ np.random.seed(0)
 
 user_number = 10
 blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
-trigger_url = "http://10.137.3.70:8888/trigger"
+trigger_url = "http://10.137.3.88:8888/trigger"
 total_epochs = 50
 args = None
 net_glob = None
