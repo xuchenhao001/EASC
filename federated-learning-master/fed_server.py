@@ -336,7 +336,13 @@ async def next_round(data, uuid, epochs, start_time, train_time, test_time):
     # epochs count backwards until 0
     new_epochs = epochs - 1
     # before start next round, record the time
-    with open("result-record_" + uuid + ".txt", "a") as time_record_file:
+    filename = "result-record_" + uuid + ".txt"
+    # first time clean the file
+    if epochs == total_epochs:
+        with open(filename, 'w') as f:
+            pass
+
+    with open(filename, "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())
         total_time = time.time() - start_time
         communication_time = total_time - train_time - test_time
