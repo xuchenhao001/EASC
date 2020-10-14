@@ -28,9 +28,12 @@ from tornado import gen, httpclient, ioloop, web
 np.random.seed(0)
 
 user_number = 10
+hyperpara_min = 0.5
+hyperpara_max = 0.8
+negotiate_round = 10
+total_epochs = 50
 blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
 trigger_url = "http://10.137.3.70:8888/trigger"
-total_epochs = 50
 args = None
 net_glob = None
 dataset_train = None
@@ -258,9 +261,6 @@ class myNegotiateThread(Thread):
 
 async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
     print("start negotiate for user: " + my_uuid)
-    hyperpara_min = 0.5
-    hyperpara_max = 0.8
-    negotiate_round = 10
 
     negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
     negotiate_step_list = np.arange(hyperpara_min, hyperpara_max, negotiate_step)
