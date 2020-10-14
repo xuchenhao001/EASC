@@ -5,4 +5,5 @@ bin/
 vendor/
 config/
 wallet/
-time-record_*
+result-record_*
+
