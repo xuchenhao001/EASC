@@ -28,8 +28,8 @@ from tornado import gen, httpclient, ioloop, web
 np.random.seed(0)
 
 user_number = 2
-url = "http://localhost:3000/invoke/mychannel/fabcar"
-# url = "http://localhost:3000/test/echo"
+blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
+trigger_url = "http://10.0.2.15:8888/trigger"
 total_epochs = 50
 args = None
 net_glob = None
@@ -46,6 +46,8 @@ skew_users1 = None
 skew_users2 = None
 skew_users3 = None
 skew_users4 = None
+train_count_num = 0
+negotiate_count_num = 0
 
 
 def test(data):
@@ -54,7 +56,7 @@ def test(data):
 
 
 @gen.coroutine
-def http_client_post(json_body, message="None"):
+def http_client_post(url, json_body, message="None"):
     print("Start http client post: " + message)
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
@@ -157,14 +159,14 @@ async def prepare():
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(json_body, 'prepare')
+    response = await http_client_post(blockchain_server_url, json_body, 'prepare')
     print(response)
 
 
 # STEP #3
 # Federated Learning: train step
 async def train(data, uuid, epochs, start_time):
-    print('train data now for uuid: ' + uuid)
+    print('train data now for user: ' + uuid)
     w_glob = data.get("w_glob")
     conver_json_value_to_tensor(w_glob)
     net_glob.load_state_dict(w_glob)
@@ -187,26 +189,18 @@ async def train(data, uuid, epochs, start_time):
         'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(json_body, 'train')
+    response = await http_client_post(blockchain_server_url, json_body, 'train')
     print(response)
-    # check train ready
-    lock.acquire()
-    check_train_ready_map[uuid] = True
-    if len(check_train_ready_map) == user_number:
-        body_data = {
-            'message': 'train_ready',
-            'epochs': epochs,
-            'start_time': start_time,
-            'train_time': train_time,
-            'test_time': 0,
-        }
-        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-        response = await http_client_post(json_body, 'train_ready')
-        print(response)
-        check_train_ready_map.clear()
-    else:
-        print("train not ready, ignore")
-    lock.release()
+    trigger_data = {
+        'message': 'train_ready',
+        'epochs': epochs,
+        'start_time': start_time,
+        'train_time': train_time,
+        'test_time': 0,
+    }
+    json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    response = await http_client_post(trigger_url, json_body, 'train_ready')
+    print(response)
 
 
 # STEP #4
@@ -235,7 +229,7 @@ async def average(w_map, uuid, epochs, start_time, train_time):
         'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(json_body, 'w_glob')
+    response = await http_client_post(blockchain_server_url, json_body, 'w_glob')
     print(response)
     # start new thread for step #5
     thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, start_time, train_time)
@@ -305,26 +299,18 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(json_body, 'negotiate')
+    response = await http_client_post(blockchain_server_url, json_body, 'negotiate')
     print(response)
-    # check negotiate ready
-    lock.acquire()
-    check_negotiate_ready_map[my_uuid] = True
-    if len(check_negotiate_ready_map) == user_number:
-        body_data = {
-            'message': 'negotiate_ready',
-            'epochs': epochs,
-            'start_time': start_time,
-            'train_time': train_time,
-            'test_time': test_time,
-        }
-        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-        response = await http_client_post(json_body, 'negotiate_ready')
-        print(response)
-        check_negotiate_ready_map.clear()
-    else:
-        print("negotiate not ready, ignore")
-    lock.release()
+    trigger_data = {
+        'message': 'negotiate_ready',
+        'epochs': epochs,
+        'start_time': start_time,
+        'train_time': train_time,
+        'test_time': test_time,
+    }
+    json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
+    print(response)
 
 
 # STEP #7
@@ -355,7 +341,7 @@ async def next_round(data, uuid, epochs, start_time, train_time, test_time):
     # before start next round, record the time
     with open("result-record_" + uuid + ".txt", "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())
-        total_time = time.time()-start_time
+        total_time = time.time() - start_time
         communication_time = total_time - train_time - test_time
         time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "]"
                                + " <Total Time> " + str(total_time)[:8]
@@ -421,9 +407,69 @@ class MainHandler(web.RequestHandler):
                              data.get("train_time"), data.get("test_time"))
 
 
+async def train_count(epochs, start_time, train_time, test_time):
+    lock.acquire()
+    global train_count_num
+    train_count_num += 1
+    if train_count_num == user_number:
+        train_count_num = 0
+        trigger_data = {
+            'message': 'train_ready',
+            'epochs': epochs,
+            'start_time': start_time,
+            'train_time': train_time,
+            'test_time': 0,
+        }
+        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+            'utf8')
+        response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
+        print(response)
+    lock.release()
+
+
+async def negotiate_count(epochs, start_time, train_time, test_time):
+    lock.acquire()
+    global negotiate_count_num
+    negotiate_count_num += 1
+    if negotiate_count_num == user_number:
+        negotiate_count_num = 0
+        trigger_data = {
+            'message': 'negotiate_ready',
+            'epochs': epochs,
+            'start_time': start_time,
+            'train_time': train_time,
+            'test_time': test_time,
+        }
+        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+            'utf8')
+        response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
+        print(response)
+    lock.release()
+
+
+class TriggerHandler(web.RequestHandler):
+
+    async def post(self):
+        data = json.loads(self.request.body)
+        status = "yes"
+        detail = {}
+        self.set_header("Content-Type", "application/json")
+        response = {"status": status, "detail": detail}
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.write(in_json)
+
+        message = data.get("message")
+        if message == "train_ready":
+            await train_count(data.get("epochs"), data.get("start_time"), data.get("train_time"), data.get("test_time"))
+        elif message == "negotiate_ready":
+            await negotiate_count(data.get("epochs"), data.get("start_time"), data.get("train_time"),
+                                  data.get("test_time"))
+
+
 def make_app():
     return web.Application([
         (r"/messages", MainHandler),
+        (r"/trigger", TriggerHandler),
     ])
 
 
