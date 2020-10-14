@@ -345,6 +345,7 @@ async def next_round(data, uuid, epochs, start_time, train_time, test_time):
                                + " <Train Time> " + str(train_time)[:8]
                                + " <Test Time> " + str(test_time)[:8]
                                + " <Communication Time> " + str(communication_time)[:8]
+                               + " <Alpha> " + str(alpha)[:8]
                                + " <Accuracy> " + str(accuracy)[:8]
                                + "\n")
     if new_epochs > 0:
