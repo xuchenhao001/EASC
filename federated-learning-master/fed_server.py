@@ -169,7 +169,7 @@ async def train(data, uuid, epochs, start_time):
     conver_json_value_to_tensor(w_glob)
     net_glob.load_state_dict(w_glob)
 
-    idx = int(uuid)
+    idx = int(uuid) - 1
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
     train_start_time = time.time()
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
@@ -283,7 +283,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
         net_glob.load_state_dict(w_local2)
         net_glob.eval()
         # test the accuracy
-        idx = int(my_uuid)
+        idx = int(my_uuid) - 1
         acc_test, loss_test = test_img(net_glob, dataset_test, args, idx=test_users[idx])
         alpha_list.append(alpha)
         acc_test_list.append(acc_test.numpy().item(0))
