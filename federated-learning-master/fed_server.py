@@ -27,9 +27,9 @@ from tornado import gen, httpclient, ioloop, web
 
 np.random.seed(0)
 
-user_number = 10
+user_number = 2
 blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
-trigger_url = "http://10.137.3.88:8888/trigger"
+trigger_url = "http://10.137.3.70:8888/trigger"
 total_epochs = 50
 args = None
 net_glob = None
@@ -55,16 +55,15 @@ def test(data):
     return "yes", detail
 
 
-@gen.coroutine
-def http_client_post(url, json_body, message="None"):
-    print("Start http client post: " + message)
+async def http_client_post(url, json_body, message="None"):
+    print("Start http client post [" + message + "] to: " + url)
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
     try:
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
-        response = yield http_client.fetch(request)
+        response = await http_client.fetch(request)
         print("[HTTP Success] [" + message + "] SERVICE RESPONSE: %s" % response.body)
         return response.body
     except Exception as e:
@@ -321,8 +320,6 @@ async def next_round(data, uuid, epochs, start_time, train_time, test_time):
     accuracy = data.get("accuracy")
     w_map = data.get("wMap")
     w_glob_map = data.get("wGlobMap")
-    print(w_map.keys())
-    print(w_glob_map.keys())
     w_local = w_map[uuid].get("w")
     w_glob = w_glob_map[uuid].get("w_glob")
     conver_json_value_to_tensor(w_local)
@@ -413,6 +410,7 @@ async def train_count(epochs, start_time, train_time, test_time):
     train_count_num += 1
     if train_count_num == user_number:
         train_count_num = 0
+        lock.release()
         trigger_data = {
             'message': 'train_ready',
             'epochs': epochs,
@@ -424,7 +422,8 @@ async def train_count(epochs, start_time, train_time, test_time):
             'utf8')
         response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
         print(response)
-    lock.release()
+    else:
+        lock.release()
 
 
 async def negotiate_count(epochs, start_time, train_time, test_time):
@@ -433,6 +432,7 @@ async def negotiate_count(epochs, start_time, train_time, test_time):
     negotiate_count_num += 1
     if negotiate_count_num == user_number:
         negotiate_count_num = 0
+        lock.release()
         trigger_data = {
             'message': 'negotiate_ready',
             'epochs': epochs,
@@ -444,7 +444,8 @@ async def negotiate_count(epochs, start_time, train_time, test_time):
             'utf8')
         response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
         print(response)
-    lock.release()
+    else:
+        lock.release()
 
 
 class TriggerHandler(web.RequestHandler):
