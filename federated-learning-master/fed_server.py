@@ -51,6 +51,9 @@ skew_users3 = None
 skew_users4 = None
 train_count_num = 0
 negotiate_count_num = 0
+g_start_time = {}
+g_train_time = {}
+g_test_time = {}
 
 
 def test(data):
@@ -155,9 +158,6 @@ async def prepare():
             'w_glob': w_glob,
             'user_number': user_number,
         },
-        'start_time': time.time(),
-        'train_time': 0,
-        'test_time': 0,
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -186,9 +186,6 @@ async def train(data, uuid, epochs, start_time):
         },
         'uuid': uuid,
         'epochs': epochs,
-        'start_time': start_time,
-        'train_time': train_time,
-        'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(blockchain_server_url, json_body, 'train')
@@ -196,9 +193,9 @@ async def train(data, uuid, epochs, start_time):
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
-        'start_time': 0,
-        'train_time': 0,
-        'test_time': 0,
+        'uuid': uuid,
+        'start_time': start_time,
+        'train_time': train_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(trigger_url, json_body, 'train_ready')
@@ -226,9 +223,6 @@ async def average(w_map, uuid, epochs):
         },
         'uuid': uuid,
         'epochs': epochs,
-        'start_time': 0,
-        'train_time': 0,
-        'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(blockchain_server_url, json_body, 'w_glob')
@@ -289,9 +283,6 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         },
         'uuid': my_uuid,
         'epochs': epochs,
-        'start_time': 0,
-        'train_time': 0,
-        'test_time': test_time,
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -300,9 +291,8 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
-        'start_time': 0,
-        'train_time': 0,
-        'test_time': 0,
+        'uuid': my_uuid,
+        'test_time': test_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
@@ -311,7 +301,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
 
 # STEP #7
 # Federated Learning: with new alpha, train w_local2, restart the round
-async def next_round(data, uuid, epochs, start_time, train_time, test_time):
+async def next_round(data, uuid, epochs):
     print('received alpha, train new w_glob for uuid: ' + uuid)
     alpha = data.get("alpha")
     accuracy = data.get("accuracy")
@@ -332,6 +322,21 @@ async def next_round(data, uuid, epochs, start_time, train_time, test_time):
     }
     # epochs count backwards until 0
     new_epochs = epochs - 1
+    # fetch time record
+    fetch_data = {
+        'message': 'fetch_time',
+        'uuid': uuid,
+        'epochs': epochs,
+    }
+    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
+    responseObj = json.loads(response)
+    detail = responseObj.get("detail")
+    print(detail)
+    start_time = detail.get("start_time")
+    print(start_time)
+    test_time = detail.get("test_time")
+    train_time = detail.get("train_time")
     # before start next round, record the time
     filename = "result-record_" + uuid + ".txt"
     # first time clean the file
@@ -403,23 +408,24 @@ class MainHandler(web.RequestHandler):
         elif message == "average":
             await average(data.get("data"), data.get("uuid"), data.get("epochs"))
         elif message == "alpha":
-            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"),
-                             data.get("train_time"), data.get("test_time"))
+            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"))
 
 
-async def train_count(epochs, start_time, train_time, test_time):
+async def train_count(epochs, uuid, start_time, train_time):
     lock.acquire()
     global train_count_num
+    global g_start_time
+    global g_train_time
     train_count_num += 1
+    key = str(uuid) + "-" + str(epochs)
+    g_start_time[key] = start_time
+    g_train_time[key] = train_time
     if train_count_num == user_number:
         train_count_num = 0
         lock.release()
         trigger_data = {
             'message': 'train_ready',
             'epochs': epochs,
-            'start_time': start_time,
-            'train_time': train_time,
-            'test_time': 0,
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
@@ -429,19 +435,19 @@ async def train_count(epochs, start_time, train_time, test_time):
         lock.release()
 
 
-async def negotiate_count(epochs, start_time, train_time, test_time):
+async def negotiate_count(epochs, uuid, test_time):
     lock.acquire()
     global negotiate_count_num
+    global g_test_time
     negotiate_count_num += 1
+    key = str(uuid) + "-" + str(epochs)
+    g_test_time[key] = test_time
     if negotiate_count_num == user_number:
         negotiate_count_num = 0
         lock.release()
         trigger_data = {
             'message': 'negotiate_ready',
             'epochs': epochs,
-            'start_time': start_time,
-            'train_time': train_time,
-            'test_time': test_time,
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
@@ -449,6 +455,21 @@ async def negotiate_count(epochs, start_time, train_time, test_time):
         print(response)
     else:
         lock.release()
+
+
+async def fetch_time(uuid, epochs):
+    key = str(uuid) + "-" + str(epochs)
+    start_time = g_start_time.get(key)
+    train_time = g_train_time.get(key)
+    test_time = g_test_time.get(key)
+    print("get start time for: " + key)
+    print(start_time)
+    detail = {
+        "start_time": start_time,
+        "train_time": train_time,
+        "test_time": test_time,
+    }
+    return detail
 
 
 class TriggerHandler(web.RequestHandler):
@@ -458,16 +479,18 @@ class TriggerHandler(web.RequestHandler):
         status = "yes"
         detail = {}
         self.set_header("Content-Type", "application/json")
-        response = {"status": status, "detail": detail}
-        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-        self.write(in_json)
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("start_time"), data.get("train_time"), data.get("test_time"))
+            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
         elif message == "negotiate_ready":
-            await negotiate_count(data.get("epochs"), data.get("start_time"), data.get("train_time"),
-                                  data.get("test_time"))
+            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
+        elif message == "fetch_time":
+            detail = await fetch_time(data.get("uuid"), data.get("epochs"))
+
+        response = {"status": status, "detail": detail}
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.write(in_json)
 
 
 def make_app():
