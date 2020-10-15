@@ -461,8 +461,6 @@ async def fetch_time(uuid, epochs):
     start_time = g_start_time.get(key)
     train_time = g_train_time.get(key)
     test_time = g_test_time.get(key)
-    print("get start time for: " + key)
-    print(start_time)
     detail = {
         "start_time": start_time,
         "train_time": train_time,
