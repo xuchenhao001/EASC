@@ -11,7 +11,7 @@ for i in ${!AllNodesAddrs[@]}; do
   index=$(printf "%02d" $((i+2)))
   # scp fabric-samples/bin.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/bin.tar.gz
 
-    ssh ubuntu@${AllNodesAddrs[$i]} " kill -9 \$(ps -ef|grep '[f]ed_server.py'|awk '{print \$2}')"
-    ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
+  ssh ubuntu@${AllNodesAddrs[$i]} " kill -9 \$(ps -ef|grep '[f]ed_server.py'|awk '{print \$2}')"
+  ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
 done
 
