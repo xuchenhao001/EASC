@@ -138,8 +138,23 @@ POST /invoke/mychannel/fabcar 500 4704.264 ms - 97
 FIX:
 
 ```bash
-# At blockchain-server/lib/contract.js, line 230, changed to:
+# At blockchain-server/node_modules/fabric-network/lib/contract.js, line 230, changed to:
 const requestTimeout = 30000
 await this.discoveryService.send({ asLocalhost, targets, requestTimeout });
+```
+
+BUG:
+
+```bash
+2020-10-15T08:32:33.934Z - error: [EventService]: EventService[10.137.3.70:7051] timed out after:3000
+2020-10-15T08:32:33.935Z - error: [EventService]: send[10.137.3.70:7051] - #245 - Starting stream to 10.137.3.70:7051 failed
+2020-10-15T08:32:33.937Z - error: [EventService]: send[10.137.3.70:7051] - #245 - no targets started - Error: Event service timed out - Unable to start listening
+```
+
+FIX:
+
+```bash
+# At blockchain-server/node_modules/fabric-common/lib/EventService.js, line 366, changed to:
+this._currentEventer = await this._startService(target, envelope, 30000);
 ```
 
