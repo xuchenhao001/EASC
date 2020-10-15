@@ -217,6 +217,7 @@ function networkUp() {
   fi
 
   releaseCerts
+  cleanResults
 }
 
 function releaseCerts() {
@@ -231,6 +232,14 @@ function releaseCerts() {
     ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
   done
   rm -f peerOrganizations.tar.gz
+}
+
+function cleanResults() {
+  rm -f ~/EASC/federated-learning-master/result-record_*.txt
+  for i in ${!AllNodesAddrs[@]}; do
+    index=$(printf "%02d" $((i+2)))
+    ssh ubuntu@${AllNodesAddrs[$i]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+  done
 }
 
 ## call the script to join create the channel and join the peers of org1 and org2
