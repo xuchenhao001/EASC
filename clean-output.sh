@@ -10,7 +10,7 @@ cp federated-learning-master/result-record_*.txt output/
 
 for i in ${!AllNodesAddrs[@]}; do
   index=$(printf "%02d" $((i+2)))
-  scp ubuntu@${AllNodesAddrs[$i]}:~/EASC/federated-learning-master/result-record_*.txt output/
-  # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/ && git pull"
+  # scp ubuntu@${AllNodesAddrs[$i]}:~/EASC/federated-learning-master/result-record_*.txt output/
+  ssh ubuntu@${AllNodesAddrs[$i]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
 done
 
