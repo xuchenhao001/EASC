@@ -23,11 +23,11 @@ from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img
 
-from tornado import gen, httpclient, ioloop, web
+from tornado import httpclient, ioloop, web
 
 np.random.seed(0)
 
-user_number = 10
+user_number = 20
 hyperpara_min = 0.5
 hyperpara_max = 0.8
 negotiate_round = 10
