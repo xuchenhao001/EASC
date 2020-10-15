@@ -338,15 +338,18 @@ func findMinAccVar(accAlphaMap map[string]AccAlpha) float64 {
 }
 
 func sendPostRequest(buf []byte, requestType string) {
-	resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(buf))
-	if err2 != nil {
-		fmt.Printf("[Error] failed to send post request to server. %s\n", err2.Error())
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(buf))
+	if err != nil {
+		fmt.Printf("[Error] failed to send post request to server. %s\n", err.Error())
+		return
 	}
+	defer resp.Body.Close()
 	if resp != nil {
 		fmt.Println(requestType + ": " + resp.Status)
 	} else {
 		fmt.Println(requestType + ": No reply")
 	}
+
 }
 
 func main() {
@@ -362,4 +365,3 @@ func main() {
 		fmt.Printf("Error starting chaincode: %s", err.Error())
 	}
 }
-
