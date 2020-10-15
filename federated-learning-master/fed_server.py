@@ -27,7 +27,7 @@ from tornado import httpclient, ioloop, web
 
 np.random.seed(0)
 
-user_number = 20
+user_number = 30
 hyperpara_min = 0.5
 hyperpara_max = 0.8
 negotiate_round = 10
