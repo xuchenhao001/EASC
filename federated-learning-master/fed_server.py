@@ -196,8 +196,8 @@ async def train(data, uuid, epochs, start_time):
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
-        'start_time': start_time,
-        'train_time': train_time,
+        'start_time': 0,
+        'train_time': 0,
         'test_time': 0,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
@@ -207,7 +207,7 @@ async def train(data, uuid, epochs, start_time):
 
 # STEP #4
 # Federated Learning: average w for w_glob
-async def average(w_map, uuid, epochs, start_time, train_time):
+async def average(w_map, uuid, epochs):
     print('received average request.')
     wArray = []
     for i in w_map.keys():
@@ -226,40 +226,37 @@ async def average(w_map, uuid, epochs, start_time, train_time):
         },
         'uuid': uuid,
         'epochs': epochs,
-        'start_time': start_time,
-        'train_time': train_time,
+        'start_time': 0,
+        'train_time': 0,
         'test_time': 0,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(blockchain_server_url, json_body, 'w_glob')
     print(response)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, start_time, train_time)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
     thread_negotiate.start()
 
 
 # STEP #5
 # Federated Learning: negotiate and test accuracy, upload to blockchain
 class myNegotiateThread(Thread):
-    def __init__(self, my_uuid, w_glob, w_local, epochs, start_time, train_time):
+    def __init__(self, my_uuid, w_glob, w_local, epochs):
         Thread.__init__(self)
         self.my_uuid = my_uuid
         self.w_glob = w_glob
         self.w_local = w_local
         self.epochs = epochs
-        self.start_time = start_time
-        self.train_time = train_time
 
     def run(self):
         print("start my negotiate thread: " + self.my_uuid)
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.start_time,
-                                          self.train_time))
+        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs))
         # negotiate(self.my_uuid, self.w_glob, self.w_local)
         print("end my negotiate thread: " + self.my_uuid)
 
 
-async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
+async def negotiate(my_uuid, w_glob, w_local, epochs):
     print("start negotiate for user: " + my_uuid)
 
     negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
@@ -292,8 +289,8 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
         },
         'uuid': my_uuid,
         'epochs': epochs,
-        'start_time': start_time,
-        'train_time': train_time,
+        'start_time': 0,
+        'train_time': 0,
         'test_time': test_time,
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
@@ -303,9 +300,9 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, start_time, train_time):
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
-        'start_time': start_time,
-        'train_time': train_time,
-        'test_time': test_time,
+        'start_time': 0,
+        'train_time': 0,
+        'test_time': 0,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
@@ -402,10 +399,9 @@ class MainHandler(web.RequestHandler):
         if message == "test":
             test(data.get("data"))
         elif message == "prepare":
-            await train(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"))
+            await train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time())
         elif message == "average":
-            await average(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"),
-                          data.get("train_time"))
+            await average(data.get("data"), data.get("uuid"), data.get("epochs"))
         elif message == "alpha":
             await next_round(data.get("data"), data.get("uuid"), data.get("epochs"), data.get("start_time"),
                              data.get("train_time"), data.get("test_time"))
