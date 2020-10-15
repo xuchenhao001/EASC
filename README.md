@@ -125,3 +125,21 @@ Trigger training start:
 curl -i -X GET 'http://localhost:8888/messages'
 ```
 
+# BUG FIX
+
+BUG:
+
+```bash
+2020-10-15T02:05:37.960Z - error: [Discoverer]: sendDiscovery[peer0.org1.example.com] - timed out after:3000
+[2020-10-15T13:05:37.976] [ERROR] COMMON - {"status":"INTERNAL_SERVER_ERROR","error":"Failed to submit transaction: Error: REQUEST TIMEOUT"}
+POST /invoke/mychannel/fabcar 500 4704.264 ms - 97
+```
+
+FIX:
+
+```bash
+# At blockchain-server/lib/contract.js, line 230, changed to:
+const requestTimeout = 30000
+await this.discoveryService.send({ asLocalhost, targets, requestTimeout });
+```
+
