@@ -84,6 +84,59 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 	return nil
 }
 
+func saveTime(ctx contractapi.TransactionContextInterface, timeType string, epochs int, myUUID string,
+	value float64) error {
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("save [" + timeType + "] time to DB in epoch [" + epochsString  + "] for uuid: [" + myUUID + "]")
+
+	key, err := ctx.GetStub().CreateCompositeKey(timeType, []string{epochsString, myUUID})
+	if err !=nil {
+		return fmt.Errorf("failed to composite key: %s", err.Error())
+	}
+
+	valueAsBytes := []byte(fmt.Sprintf("%f", value))
+	err = ctx.GetStub().PutState(key, valueAsBytes)
+	if err != nil {
+		return fmt.Errorf("failed to save time into state: %s", err.Error())
+	}
+	return nil
+}
+
+func readTime(ctx contractapi.TransactionContextInterface, timeType string,
+	epochs int, myUUID string) (float64, error) {
+
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("read [" + timeType + "] map from DB in epoch [" + epochsString  + "]")
+
+	mapIter, err := ctx.GetStub().GetStateByPartialCompositeKey(timeType, []string{epochsString})
+	if err != nil {
+		return 0, fmt.Errorf("failed to read time from state by partial composite key: %s", err.Error())
+	}
+	defer mapIter.Close()
+
+	for mapIter.HasNext() {
+		mapItem, err := mapIter.Next()
+		if err != nil {
+			return 0, fmt.Errorf("failed to read next time item from state: %s", err.Error())
+		}
+
+		var compositeKeyAttri []string
+		_, compositeKeyAttri, err = ctx.GetStub().SplitCompositeKey(mapItem.Key)
+		if err != nil {
+			return 0, fmt.Errorf("failed to split composite key: %s", err.Error())
+		}
+		if myUUID == compositeKeyAttri[1] {
+			value, err := strconv.ParseFloat(string(mapItem.Value), 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to convert value from []byte to float64: %s", err.Error())
+			}
+			return value, nil
+		}
+	}
+
+	return 0, fmt.Errorf("failed to find time from db")
+}
+
 func saveAsMap(ctx contractapi.TransactionContextInterface, keyType string, epochs int, myUUID string,
 	value interface{}) error {
 	epochsString := strconv.Itoa(epochs)
@@ -148,6 +201,18 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
 		return fmt.Errorf("failed to update w map into state. %s", err.Error())
+	}
+
+	// save start time into blockchain
+	err = saveTime(ctx, "startTime", recMsg.Epochs, recMsg.Uuid, recMsg.StartTime)
+	if err != nil {
+		return fmt.Errorf("failed to save start time to db: %s", err.Error())
+	}
+
+	// store train time into blockchain
+	err = saveTime(ctx, "trainTime", recMsg.Epochs, recMsg.Uuid, recMsg.TrainTime)
+	if err != nil {
+		return fmt.Errorf("failed to save train time to db: %s", err.Error())
 	}
 	return nil
 }
@@ -214,6 +279,12 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 		return fmt.Errorf("failed to update acc_test and alpha map into state. %s", err.Error())
 	}
 
+	// store test time into blockchain
+	err = saveTime(ctx, "testTime", recMsg.Epochs, recMsg.Uuid, recMsg.TestTime)
+	if err != nil {
+		return fmt.Errorf("failed to save test time to db: %s", err.Error())
+	}
+
 	return nil
 }
 
@@ -251,6 +322,21 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 		if err != nil {
 			return fmt.Errorf("failed to read wGlobMap from state. %s", err.Error())
 		}
+		// load startTime from db
+		starTime, err := readTime(ctx, "startTime", recMsg.Epochs, myuuid)
+		if err != nil {
+			return fmt.Errorf("failed to read start time from state. %s", err.Error())
+		}
+		// load trainTime from db
+		trainTime, err := readTime(ctx, "trainTime", recMsg.Epochs, myuuid)
+		if err != nil {
+			return fmt.Errorf("failed to read train time from state. %s", err.Error())
+		}
+		// load testTime from db
+		testTime, err := readTime(ctx, "testTime", recMsg.Epochs, myuuid)
+		if err != nil {
+			return fmt.Errorf("failed to read test time from state. %s", err.Error())
+		}
 		// release alpha and w
 		data := make(map[string]interface{})
 		data["alpha"] = alpha // alpha is included in data
@@ -262,9 +348,9 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 		sendMsg.Data = data
 		sendMsg.Uuid = myuuid
 		sendMsg.Epochs = recMsg.Epochs
-		sendMsg.StartTime = recMsg.StartTime
-		sendMsg.TrainTime = recMsg.TrainTime
-		sendMsg.TestTime = recMsg.TestTime
+		sendMsg.StartTime = starTime
+		sendMsg.TrainTime = trainTime
+		sendMsg.TestTime = testTime
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 
 		go sendPostRequest(sendMsgAsBytes, "NEGOTIATE")
@@ -338,15 +424,18 @@ func findMinAccVar(accAlphaMap map[string]AccAlpha) float64 {
 }
 
 func sendPostRequest(buf []byte, requestType string) {
-	resp, err2 := http.Post(url, "application/json", bytes.NewBuffer(buf))
-	if err2 != nil {
-		fmt.Printf("[Error] failed to send post request to server. %s\n", err2.Error())
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(buf))
+	if err != nil {
+		fmt.Printf("[Error] failed to send post request to server. %s\n", err.Error())
+		return
 	}
+	defer resp.Body.Close()
 	if resp != nil {
 		fmt.Println(requestType + ": " + resp.Status)
 	} else {
 		fmt.Println(requestType + ": No reply")
 	}
+
 }
 
 func main() {
