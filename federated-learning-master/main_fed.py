@@ -27,6 +27,7 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 trigger_url = "http://10.137.3.70:8181/messages"
+# trigger_url = "http://localhost:8181/messages"
 # TO BE CHANGED
 # how many threads on a node
 thread_num = 1
@@ -39,7 +40,9 @@ wMap = {}
 ipMap = {}
 net_glob = None
 args = None
+dataset_train = None
 dataset_test = None
+dict_users = None
 test_users = None
 skew_users1 = None
 skew_users2 = None
@@ -49,10 +52,12 @@ g_start_time = {}
 g_train_time = {}
 
 
-async def train(user_id, start_time, epochs):
+async def train(user_id, w_glob, start_time, epochs):
     global net_glob
     global args
+    global dataset_train
     global dataset_test
+    global dict_users
     global test_users
     global skew_users1
     global skew_users2
@@ -64,49 +69,55 @@ async def train(user_id, start_time, epochs):
     args = args_parser()
     args.device = torch.device('cpu')
 
+    # the first time to train, init net_glob
     if epochs is None:
         epochs = args.epochs
 
-    # load dataset and split users
-    if args.dataset == 'mnist':
-        trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-        dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
-        dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
-        # sample users
-        if args.iid:
-            dict_users = mnist_iid(dataset_train, args.num_users)
+        # load dataset and split users
+        if args.dataset == 'mnist':
+            trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+            dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
+            dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+            # sample users
+            if args.iid:
+                dict_users = mnist_iid(dataset_train, args.num_users)
+            else:
+                dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = \
+                    noniid_onepass(dataset_train, dataset_test, args.num_users)
+        elif args.dataset == 'cifar':
+            trans_cifar = transforms.Compose(
+                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
+            dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
+            if args.iid:
+                dict_users = cifar_iid(dataset_train, args.num_users)
+            else:
+                dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(
+                    dataset_train,
+                    dataset_test,
+                    args.num_users)
+                # exit('Error: only consider IID setting in CIFAR10')
         else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = \
-                noniid_onepass(dataset_train, dataset_test, args.num_users)
-    elif args.dataset == 'cifar':
-        trans_cifar = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
-        dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
-        if args.iid:
-            dict_users = cifar_iid(dataset_train, args.num_users)
-        else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
-                                                                                                        dataset_test,
-                                                                                                        args.num_users)
-            # exit('Error: only consider IID setting in CIFAR10')
-    else:
-        exit('Error: unrecognized dataset')
-    img_size = dataset_train[0][0].shape
+            exit('Error: unrecognized dataset')
+        img_size = dataset_train[0][0].shape
 
-    # build model, init part
-    if args.model == 'cnn' and args.dataset == 'cifar':
-        net_glob = CNNCifar(args=args).to(args.device)
-    elif args.model == 'cnn' and args.dataset == 'mnist':
-        net_glob = CNNMnist(args=args).to(args.device)
-    elif args.model == 'mlp':
-        len_in = 1
-        for x in img_size:
-            len_in *= x
-        net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
+        # build model, init part
+        if args.model == 'cnn' and args.dataset == 'cifar':
+            net_glob = CNNCifar(args=args).to(args.device)
+        elif args.model == 'cnn' and args.dataset == 'mnist':
+            net_glob = CNNMnist(args=args).to(args.device)
+        elif args.model == 'mlp':
+            len_in = 1
+            for x in img_size:
+                len_in *= x
+            net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
+        else:
+            exit('Error: unrecognized model')
+        print(net_glob)
     else:
-        exit('Error: unrecognized model')
-    print(net_glob)
+        # load w_glob as net_glob
+        net_glob.load_state_dict(w_glob)
+        net_glob.eval()
 
     # training
     train_start_time = time.time()
@@ -173,7 +184,7 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     if new_epochs > 0:
         print("####################\nEpoch #", new_epochs, " start now\n####################")
         # reset a new time for next round
-        asyncio.ensure_future(train(user_id, time.time(), new_epochs))
+        asyncio.ensure_future(train(user_id, w_glob, time.time(), new_epochs))
     else:
         print("##########\nALL DONE!\n##########")
 
@@ -186,7 +197,7 @@ class MultiTrainThread(Thread):
         time.sleep(start_wait_time)
         print("start new thread")
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(train(None, time.time(), None))
+        loop.run_until_complete(train(None, None, time.time(), None))
         print("end thread")
 
 
