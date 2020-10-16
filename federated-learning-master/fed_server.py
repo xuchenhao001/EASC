@@ -129,11 +129,9 @@ def init():
     idxs_users = np.random.choice(range(user_number), m, replace=False)
 
     # build model, init part
-    if args.model == 'cnn' and args.dataset == 'cifar':
+    if args.dataset == 'cifar':
         net_glob = CNNCifar(args=args).to(args.device)
-    elif args.model == 'cnn' and args.dataset == 'mnist':
-        net_glob = CNNMnist(args=args).to(args.device)
-    elif args.model == 'mlp':
+    elif args.dataset == 'mnist':
         len_in = 1
         for x in img_size:
             len_in *= x
