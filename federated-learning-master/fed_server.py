@@ -129,14 +129,15 @@ def init():
     idxs_users = np.random.choice(range(user_number), m, replace=False)
 
     # build model, init part
-    if args.dataset == 'cifar':
+    if args.model == 'cnn' and args.dataset == 'cifar':
         net_glob = CNNCifar(args=args).to(args.device)
-    elif args.dataset == 'mnist':
-        net_glob = CNNCifar(args=args).to(args.device)
-        # len_in = 1
-        # for x in img_size:
-        #     len_in *= x
-        # net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
+    elif args.model == 'cnn' and args.dataset == 'mnist':
+        net_glob = CNNMnist(args=args).to(args.device)
+    elif args.model == 'mlp':
+        len_in = 1
+        for x in img_size:
+            len_in *= x
+        net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
     else:
         exit('Error: unrecognized model')
     print(net_glob)
