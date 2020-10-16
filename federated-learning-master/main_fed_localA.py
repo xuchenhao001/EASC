@@ -1,0 +1,488 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Python version: 3.6
+import asyncio
+import matplotlib
+import threading
+from threading import Thread
+import time
+import socket
+
+matplotlib.use('Agg')
+import copy
+import numpy as np
+from torchvision import datasets, transforms
+import torch
+import json
+from tornado import httpclient, ioloop, web
+
+from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, noniid_onepass
+from utils.options import args_parser
+from models.Update import LocalUpdate
+from models.Nets import MLP, CNNMnist, CNNCifar
+from models.Fed import FedAvg
+from models.test import test_img
+
+torch.manual_seed(0)
+np.random.seed(0)
+
+trigger_url = "http://10.137.3.70:8181/messages"
+# trigger_url = "http://localhost:8181/messages"
+# TO BE CHANGED
+# how many threads on a node
+thread_num = 1
+# wait in seconds for other nodes to start
+start_wait_time = 15
+# TO BE CHANGED FINISHED
+g_user_id = 0
+lock = threading.Lock()
+wMap = {}
+wLocalsMap = {}
+wLocalsPerMap = {}
+hyperparaMap = {}
+ipMap = {}
+net_glob = None
+args = None
+dataset_train = None
+dataset_test = None
+dict_users = None
+test_users = None
+skew_users1 = None
+skew_users2 = None
+skew_users3 = None
+skew_users4 = None
+g_start_time = {}
+g_train_time = {}
+
+differenc1 = None
+differenc2 = None
+
+
+async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
+    global net_glob
+    global args
+    global dataset_train
+    global dataset_test
+    global dict_users
+    global test_users
+    global skew_users1
+    global skew_users2
+    global skew_users3
+    global skew_users4
+    global differenc1
+    global differenc2
+    if user_id is None:
+        user_id = await fetch_user_id()
+    # parse args
+    args = args_parser()
+    args.device = torch.device('cpu')
+
+    # the first time to train, init net_glob
+    if epochs is None:
+        epochs = args.epochs
+
+        # load dataset and split users
+        if args.dataset == 'mnist':
+            trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+            dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
+            dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+            # sample users
+            if args.iid:
+                dict_users = mnist_iid(dataset_train, args.num_users)
+            else:
+                dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = \
+                    noniid_onepass(dataset_train, dataset_test, args.num_users)
+        elif args.dataset == 'cifar':
+            trans_cifar = transforms.Compose(
+                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
+            dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
+            if args.iid:
+                dict_users = cifar_iid(dataset_train, args.num_users)
+            else:
+                dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(
+                    dataset_train,
+                    dataset_test,
+                    args.num_users)
+                # exit('Error: only consider IID setting in CIFAR10')
+        else:
+            exit('Error: unrecognized dataset')
+        img_size = dataset_train[0][0].shape
+
+        # build model, init part
+        if args.model == 'cnn' and args.dataset == 'cifar':
+            net_glob = CNNCifar(args=args).to(args.device)
+        elif args.model == 'cnn' and args.dataset == 'mnist':
+            net_glob = CNNMnist(args=args).to(args.device)
+        elif args.model == 'mlp':
+            len_in = 1
+            for x in img_size:
+                len_in *= x
+            net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
+        else:
+            exit('Error: unrecognized model')
+
+        # initialize weights of model
+        net_glob.train()
+        w_glob = net_glob.state_dict()  # global model initialization
+        w_local = copy.deepcopy(w_glob)
+        differenc1 = copy.deepcopy(w_glob)
+        differenc2 = copy.deepcopy(w_glob)
+
+        # for the first epoch, init user local parameters, w,v,v_bar,alpha
+        w_glob_local = copy.deepcopy(w_glob)
+        w_locals = copy.deepcopy(w_local)
+        w_locals_per = copy.deepcopy(w_local)
+        hyperpara = args.hyper
+    else:
+        conver_json_value_to_tensor(w_glob_local)
+        conver_json_value_to_tensor(w_locals)
+        conver_json_value_to_tensor(w_locals_per)
+        w_glob = copy.deepcopy(w_glob_local)
+
+    # training for all epochs
+    for iter in reversed(range(epochs)):
+        print("Epoch [" + str(iter+1) + "] train for user [" + str(user_id) + "]")
+        train_start_time = time.time()
+        # compute v_bar
+        for j in w_glob.keys():
+            w_locals_per[j] = hyperpara * w_locals[j] + (1 - hyperpara) * w_glob_local[j]
+            differenc1[j] = w_locals[j] - w_glob_local[j]
+
+        # train local global weight
+        net_glob.load_state_dict(w_glob_local)
+        local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[user_id - 1])
+        w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+        for j in w_glob.keys():
+            w_glob_local[j] = copy.deepcopy(w[j])
+
+        # train local model weight
+        net_glob.load_state_dict(w_locals_per)
+        local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[user_id - 1])
+        w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+        # loss_locals.append(copy.deepcopy(loss))
+
+        for j in w_glob.keys():
+            differenc2[j] = (w[j] - w_locals[j]) * 100.0
+            w_locals[j] = copy.deepcopy(w[j])
+
+            # update adaptive alpha
+        d1, d2 = [], []
+        correlation = 0.0
+        l = 0
+        for j in w_glob.keys():
+            d = differenc1[j].numpy()
+            d1 = np.ndarray.flatten(d)
+            d = differenc2[j].numpy()
+            d2 = np.ndarray.flatten(d)
+            l = l + 1
+            correlation = correlation + np.dot(d1, d2)
+        correlation = correlation / l
+        # print(correlation)
+        hyperpara = round((hyperpara - args.lr * correlation), 2)
+        if hyperpara > 1.0:
+            hyperpara = 1.0
+        # print(hyperpara)
+
+        # update local personalized weight
+        for j in w_glob.keys():
+            w_locals_per[j] = hyperpara * w_locals[j] + (1 - hyperpara) * w_glob_local[j]
+        train_time = time.time() - train_start_time
+
+        # start test
+        test_start_time = time.time()
+        correct_test, loss_test = test_img(net_glob, dataset_test, test_users[user_id - 1], args)
+        acc_local = torch.div(100.0 * correct_test, len(test_users[user_id - 1]))
+
+        # skew 5%
+        correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[user_id - 1], args)
+        acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
+                                    (len(test_users[user_id - 1]) + len(skew_users1[user_id - 1])))
+        # skew 10%
+        correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[user_id - 1], args)
+        acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
+                                    (len(test_users[user_id - 1]) + len(skew_users2[user_id - 1])))
+        # skew 15%
+        correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[user_id - 1], args)
+        acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
+                                    (len(test_users[user_id - 1]) + len(skew_users3[user_id - 1])))
+        # skew 20%
+        correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[user_id - 1], args)
+        acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
+                                    (len(test_users[user_id - 1]) + len(skew_users4[user_id - 1])))
+
+        test_time = time.time() - test_start_time
+
+        # before start next round, record the time
+        filename = "result-record_" + str(user_id) + ".txt"
+        # first time clean the file
+        if iter + 1 == args.epochs:
+            with open(filename, 'w') as f:
+                pass
+
+        with open(filename, "a") as time_record_file:
+            current_time = time.strftime("%H:%M:%S", time.localtime())
+            total_time = time.time() - start_time
+            communication_time = total_time - train_time - test_time
+            time_record_file.write(current_time + "[" + f"{iter + 1:0>2}" + "]"
+                                   + " <Total Time> " + str(total_time)[:8]
+                                   + " <Train Time> " + str(train_time)[:8]
+                                   + " <Test Time> " + str(test_time)[:8]
+                                   + " <Communication Time> " + str(communication_time)[:8]
+                                   + " <acc_local> " + str(acc_local.item())[:8]
+                                   + " <acc_local_skew1> " + str(acc_local_skew1.item())[:8]
+                                   + " <acc_local_skew2> " + str(acc_local_skew2.item())[:8]
+                                   + " <acc_local_skew3> " + str(acc_local_skew3.item())[:8]
+                                   + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
+                                   + "\n")
+        start_time = time.time()
+        if (iter + 1) % 10 == 0:  # update global model
+            from_ip = get_ip()
+            await upload_local_w(user_id, iter, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara,
+                                 start_time)
+            return
+
+    print("##########\nALL DONE!\n##########")
+    return
+
+
+class MultiTrainThread(Thread):
+    def __init__(self, user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
+        Thread.__init__(self)
+        self.user_id = user_id
+        self.epochs = epochs
+        self.w_glob_local = w_glob_local
+        self.w_locals = w_locals
+        self.w_locals_per = w_locals_per
+        self.hyperpara = hyperpara
+        self.start_time = start_time
+
+    def run(self):
+        time.sleep(start_wait_time)
+        print("start new thread")
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(train(self.user_id, self.epochs, self.w_glob_local, self.w_locals, self.w_locals_per,
+                                      self.hyperpara, self.start_time))
+        print("end thread")
+
+
+def test(data):
+    detail = {"data": data}
+    return detail
+
+
+async def load_user_id():
+    lock.acquire()
+    global g_user_id
+    g_user_id += 1
+    detail = {"user_id": g_user_id}
+    lock.release()
+    return detail
+
+
+async def release_global_w(epochs):
+    lock.acquire()
+    global g_user_id
+    g_user_id = 0
+    lock.release()
+    w_glob_local = FedAvg(wMap[epochs])
+    convert_tensor_value_to_numpy(w_glob_local)
+    for user_id in ipMap.keys():
+        key = str(user_id) + "-" + str(epochs)
+        start_time = g_start_time.get(key)
+        w_locals = wLocalsMap.get(user_id)
+        w_locals_per = wLocalsPerMap.get(user_id)
+        hyperpara = hyperparaMap.get(user_id)
+        data = {
+            'message': 'release_global_w',
+            'user_id': user_id,
+            'epochs': epochs,
+            'w_glob_local': w_glob_local,
+            'w_locals': w_locals,
+            'w_locals_per': w_locals_per,
+            'hyperpara': hyperpara,
+            'start_time': start_time,
+        }
+        json_body = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+        my_url = "http://" + ipMap[user_id] + ":8181/messages"
+        asyncio.ensure_future(http_client_post(my_url, json_body, 'release_global_w'))
+
+
+async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
+    print("received average request from user: " + str(user_id))
+    lock.acquire()
+    global wMap
+    global wLocalsMap
+    global wLocalsPerMap
+    global hyperparaMap
+    global ipMap
+
+    global g_start_time
+    global g_train_time
+    key = str(user_id) + "-" + str(epochs)
+    g_start_time[key] = start_time
+    ipMap[user_id] = from_ip
+
+    # update wMap (w_glob_local) to be averaged
+    conver_json_value_to_tensor(w_glob_local)
+    epochW = wMap.get(epochs)
+    if epochW is None:
+        wMap[epochs] = [w_glob_local]
+    else:
+        epochW.append(w_glob_local)
+        wMap[epochs] = epochW
+    # update wLocalsMap
+    wLocalsMap[user_id] = w_locals
+    wLocalsPerMap[user_id] = w_locals_per
+    hyperparaMap[user_id] = hyperpara
+    lock.release()
+    print("args.num_users: " + str(args.num_users))
+    print("len(wMap[epochs]): " + str(len(wMap[epochs])))
+    if len(wMap[epochs]) == args.num_users:
+        print("Gathered enough w, average and release them")
+        asyncio.ensure_future(release_global_w(epochs))
+
+
+async def http_client_post(url, json_body, message="None"):
+    print("Start http client post [" + message + "] to: " + url)
+    method = "POST"
+    headers = {'Content-Type': 'application/json; charset=UTF-8'}
+    http_client = httpclient.AsyncHTTPClient()
+    try:
+        request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
+                                         request_timeout=300)
+        response = await http_client.fetch(request)
+        print("[HTTP Success] [" + message + "] SERVICE RESPONSE: %s" % response.body)
+        return response.body
+    except Exception as e:
+        print("[HTTP Error] [" + message + "] SERVICE RESPONSE: %s" % e)
+        return None
+
+
+class MainHandler(web.RequestHandler):
+
+    async def get(self):
+        response = {"status": "yes", "detail": "test"}
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.set_header("Content-Type", "application/json")
+        self.write(in_json)
+
+    async def post(self):
+        data = json.loads(self.request.body)
+        status = "yes"
+        detail = {}
+        self.set_header("Content-Type", "application/json")
+
+        message = data.get("message")
+        if message == "test":
+            detail = test(data.get("weight"))
+        elif message == "fetch_user_id":
+            detail = await load_user_id()
+        elif message == "upload_local_w":
+            asyncio.ensure_future(average_local_w(data.get("user_id"), data.get("epochs"), data.get("from_ip"),
+                                  data.get("w_glob_local"), data.get("w_locals"), data.get("w_locals_per"),
+                                  data.get("hyperpara"), data.get("start_time")))
+        elif message == "release_global_w":
+            print("call from release_global_w")
+            thread_train = MultiTrainThread(data.get("user_id"), data.get("epochs"), data.get("w_glob_local"),
+                                            data.get("w_locals"), data.get("w_locals_per"), data.get("hyperpara"),
+                                            data.get("start_time"))
+            thread_train.start()
+            # train(data.get("user_id"), data.get("epochs"), data.get("w_glob_local"), data.get("w_locals"),
+            #             data.get("w_locals_per"), data.get("hyperpara"), data.get("start_time"))
+            print("call from release_global_w go on")
+
+        response = {"status": status, "detail": detail}
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.write(in_json)
+
+
+def make_app():
+    return web.Application([
+        (r"/messages", MainHandler),
+    ])
+
+
+async def fetch_user_id():
+    fetch_data = {
+        'message': 'fetch_user_id',
+    }
+    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+    response = await http_client_post(trigger_url, json_body, 'fetch_user_id')
+    responseObj = json.loads(response)
+    detail = responseObj.get("detail")
+    user_id = detail.get("user_id")
+    return user_id
+
+
+async def upload_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
+    print("upload local w to center")
+    convert_tensor_value_to_numpy(w_glob_local)
+    convert_tensor_value_to_numpy(w_locals)
+    convert_tensor_value_to_numpy(w_locals_per)
+    upload_data = {
+        'message': 'upload_local_w',
+        'user_id': user_id,
+        'epochs': epochs,
+        'w_glob_local': w_glob_local,
+        'w_locals': w_locals,
+        'w_locals_per': w_locals_per,
+        'hyperpara': hyperpara,
+        'from_ip': from_ip,
+        'start_time': start_time,
+    }
+    json_body = json.dumps(upload_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    await http_client_post(trigger_url, json_body, 'upload_local_w')
+    return
+
+
+def conver_json_value_to_tensor(data):
+    for key, value in data.items():
+        data[key] = torch.from_numpy(np.array(value))
+
+
+def convert_tensor_value_to_numpy(data):
+    for key, value in data.items():
+        data[key] = value.cpu().numpy()
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+        print("Detected IP address: " + IP)
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
+
+if __name__ == "__main__":
+    # multi-thread training here
+    threads = []
+    for i in range(thread_num):
+        thread_train = MultiTrainThread(None, None, None, None, None, None, time.time())
+        threads.append(thread_train)
+
+    # Start all threads
+    for thread in threads:
+        thread.start()
+
+    # Wait for all of threads to finish
+    # for thread in threads:
+    #     thread.join()
+
+    app = make_app()
+    app.listen(8181)
+    print("start serving at 8181...")
+    ioloop.IOLoop.current().start()
