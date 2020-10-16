@@ -26,7 +26,7 @@ from models.test import test_img
 torch.manual_seed(0)
 np.random.seed(0)
 
-trigger_url = "http://localhost:8181/messages"
+trigger_url = "http://10.137.3.70:8181/messages"
 # TO BE CHANGED
 # how many threads on a node
 thread_num = 1
