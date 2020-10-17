@@ -238,8 +238,8 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         start_time = time.time()
         if (iter + 1) % 10 == 0:  # update global model
             from_ip = get_ip()
-            asyncio.ensure_future(upload_local_w(user_id, iter, from_ip, w_glob_local, w_locals, w_locals_per,
-                                                 hyperpara, start_time))
+            await upload_local_w(user_id, iter, from_ip, w_glob_local, w_locals, w_locals_per,
+                                                 hyperpara, start_time)
             return
 
     print("##########\nALL DONE!\n##########")
