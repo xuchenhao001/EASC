@@ -21,7 +21,7 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
-from models.test import test_img
+from models.test import test_img_total
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -191,26 +191,18 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
 
         # start test
         test_start_time = time.time()
-        correct_test, loss_test = test_img(net_glob, dataset_test, test_users[user_id - 1], args)
-        acc_local = torch.div(100.0 * correct_test, len(test_users[user_id - 1]))
-
+        idx = int(user_id) - 1
+        idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+        correct = test_img_total(net_glob, dataset_test, idx_total, args)
+        acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
         # skew 5%
-        correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[user_id - 1], args)
-        acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
-                                    (len(test_users[user_id - 1]) + len(skew_users1[user_id - 1])))
+        acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
         # skew 10%
-        correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[user_id - 1], args)
-        acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
-                                    (len(test_users[user_id - 1]) + len(skew_users2[user_id - 1])))
+        acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
         # skew 15%
-        correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[user_id - 1], args)
-        acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
-                                    (len(test_users[user_id - 1]) + len(skew_users3[user_id - 1])))
+        acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
         # skew 20%
-        correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[user_id - 1], args)
-        acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
-                                    (len(test_users[user_id - 1]) + len(skew_users4[user_id - 1])))
-
+        acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
         test_time = time.time() - test_start_time
 
         # before start next round, record the time
@@ -340,8 +332,6 @@ async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_lo
     wLocalsPerMap[user_id] = w_locals_per
     hyperparaMap[user_id] = hyperpara
     lock.release()
-    print("args.num_users: " + str(args.num_users))
-    print("len(wMap[epochs]): " + str(len(wMap[epochs])))
     if len(wMap[epochs]) == args.num_users:
         print("Gathered enough w, average and release them")
         asyncio.ensure_future(release_global_w(epochs))
@@ -387,14 +377,10 @@ class MainHandler(web.RequestHandler):
                                   data.get("w_glob_local"), data.get("w_locals"), data.get("w_locals_per"),
                                   data.get("hyperpara"), data.get("start_time")))
         elif message == "release_global_w":
-            print("call from release_global_w")
             thread_train = MultiTrainThread(data.get("user_id"), data.get("epochs"), data.get("w_glob_local"),
                                             data.get("w_locals"), data.get("w_locals_per"), data.get("hyperpara"),
                                             data.get("start_time"))
             thread_train.start()
-            # train(data.get("user_id"), data.get("epochs"), data.get("w_glob_local"), data.get("w_locals"),
-            #             data.get("w_locals_per"), data.get("hyperpara"), data.get("start_time"))
-            print("call from release_global_w go on")
 
         response = {"status": status, "detail": detail}
         in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
@@ -420,7 +406,6 @@ async def fetch_user_id():
 
 
 async def upload_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
-    print("upload local w to center")
     convert_tensor_value_to_numpy(w_glob_local)
     convert_tensor_value_to_numpy(w_locals)
     convert_tensor_value_to_numpy(w_locals_per)

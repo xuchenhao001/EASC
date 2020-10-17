@@ -21,7 +21,7 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
-from models.test import test_img
+from models.test import test_img_total
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -65,12 +65,12 @@ async def train(user_id, w_glob, start_time, epochs):
     global skew_users4
     if user_id is None:
         user_id = await fetch_user_id()
-    # parse args
-    args = args_parser()
-    args.device = torch.device('cpu')
 
     # the first time to train, init net_glob
     if epochs is None:
+        # parse args
+        args = args_parser()
+        args.device = torch.device('cpu')
         epochs = args.epochs
 
         # load dataset and split users
@@ -113,7 +113,6 @@ async def train(user_id, w_glob, start_time, epochs):
             net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
         else:
             exit('Error: unrecognized model')
-        print(net_glob)
     else:
         # load w_glob as net_glob
         net_glob.load_state_dict(w_glob)
@@ -134,25 +133,18 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     net_glob.eval()
 
     test_start_time = time.time()
-    correct_test, loss_test = test_img(net_glob, dataset_test, test_users[user_id - 1], args)
-    acc_local = torch.div(100.0 * correct_test, len(test_users[user_id - 1]))
-
+    idx = int(user_id) - 1
+    idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+    correct = test_img_total(net_glob, dataset_test, idx_total, args)
+    acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
     # skew 5%
-    correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[user_id - 1], args)
-    acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
-                                (len(test_users[user_id - 1]) + len(skew_users1[user_id - 1])))
+    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
     # skew 10%
-    correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[user_id - 1], args)
-    acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
-                                (len(test_users[user_id - 1]) + len(skew_users2[user_id - 1])))
+    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
     # skew 15%
-    correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[user_id - 1], args)
-    acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
-                                (len(test_users[user_id - 1]) + len(skew_users3[user_id - 1])))
+    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
     # skew 20%
-    correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[user_id - 1], args)
-    acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
-                                (len(test_users[user_id - 1]) + len(skew_users4[user_id - 1])))
+    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
 
     test_time = time.time() - test_start_time
 
@@ -259,8 +251,6 @@ async def average_local_w(user_id, epochs, w, from_ip, start_time, train_time):
         epochW.append(w)
         wMap[epochs] = epochW
     lock.release()
-    print("args.num_users: " + str(args.num_users))
-    print("len(wMap[epochs]): " + str(len(wMap[epochs])))
     if len(wMap[epochs]) == args.num_users:
         print("Gathered enough w, average and release them")
         asyncio.ensure_future(release_global_w(epochs))
@@ -333,7 +323,6 @@ async def fetch_user_id():
 
 
 async def upload_local_w(user_id, epochs, w, from_ip, start_time, train_time):
-    print("upload local w to center")
     convert_tensor_value_to_numpy(w)
     upload_data = {
         'message': 'upload_local_w',
