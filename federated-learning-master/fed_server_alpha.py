@@ -28,7 +28,7 @@ np.random.seed(0)
 
 # TO BE CHANGED
 # alpha (stable)
-hyperpara = 0.2
+hyperpara = 0.25
 # rounds to negotiate alpha
 negotiate_round = 10
 # total train round
