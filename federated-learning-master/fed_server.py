@@ -6,7 +6,6 @@ import asyncio
 import json
 import matplotlib
 import time
-from random import randrange
 
 matplotlib.use('Agg')
 import copy
@@ -16,7 +15,7 @@ from threading import Thread
 from torchvision import datasets, transforms
 import torch
 
-from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, noniid_onepass
+from utils.sampling import mnist_iid, cifar_iid, noniid_onepass
 from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
@@ -27,13 +26,22 @@ from tornado import httpclient, ioloop, web
 
 np.random.seed(0)
 
+# TO BE CHANGED
+# user number in cluster
 user_number = 2
+# alpha minimum
 hyperpara_min = 0.5
+# alpha maximum
 hyperpara_max = 0.8
+# rounds to negotiate alpha
 negotiate_round = 10
+# total train round
 total_epochs = 50
+# blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
+# trigger_url = "http://10.137.3.70:8888/trigger"
 blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
 trigger_url = "http://localhost:8888/trigger"
+# TO BE CHANGED FINISHED
 args = None
 net_glob = None
 dataset_train = None
@@ -161,8 +169,7 @@ async def prepare():
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(blockchain_server_url, json_body, 'prepare')
-    print(response)
+    await http_client_post(blockchain_server_url, json_body, 'prepare')
 
 
 # STEP #3
@@ -188,8 +195,7 @@ async def train(data, uuid, epochs, start_time):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(blockchain_server_url, json_body, 'train')
-    print(response)
+    await http_client_post(blockchain_server_url, json_body, 'train')
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
@@ -198,8 +204,7 @@ async def train(data, uuid, epochs, start_time):
         'train_time': train_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'train_ready')
-    print(response)
+    await http_client_post(trigger_url, json_body, 'train_ready')
 
 
 # STEP #4
@@ -225,8 +230,7 @@ async def average(w_map, uuid, epochs):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(blockchain_server_url, json_body, 'w_glob')
-    print(response)
+    await http_client_post(blockchain_server_url, json_body, 'w_glob')
     # start new thread for step #5
     thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
     thread_negotiate.start()
@@ -268,7 +272,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         net_glob.eval()
         # test the accuracy
         idx = int(my_uuid) - 1
-        acc_test, loss_test = test_img(net_glob, dataset_test, args, idx=test_users[idx])
+        acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
         alpha_list.append(alpha)
         acc_test_list.append(acc_test.numpy().item(0))
         print("myuuid: " + my_uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
@@ -286,8 +290,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(blockchain_server_url, json_body, 'negotiate')
-    print(response)
+    await http_client_post(blockchain_server_url, json_body, 'negotiate')
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
@@ -295,8 +298,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         'test_time': test_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
-    print(response)
+    await http_client_post(trigger_url, json_body, 'negotiate_ready')
 
 
 # STEP #7
@@ -337,6 +339,33 @@ async def next_round(data, uuid, epochs):
     print(start_time)
     test_time = detail.get("test_time")
     train_time = detail.get("train_time")
+
+    # finally, test the acc_local, acc_local_skew1~4
+    net_glob.load_state_dict(w_local2)
+    net_glob.eval()
+    test_addition_start_time = time.time()
+    idx = int(uuid) - 1
+    correct_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
+    acc_local = torch.div(100.0 * correct_test, len(test_users[idx]))
+    # skew 5%
+    correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[idx], args)
+    acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
+                                (len(test_users[idx]) + len(skew_users1[idx])))
+    # skew 10%
+    correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[idx], args)
+    acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
+                                (len(test_users[idx]) + len(skew_users2[idx])))
+    # skew 15%
+    correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[idx], args)
+    acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
+                                (len(test_users[idx]) + len(skew_users3[idx])))
+    # skew 20%
+    correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[idx], args)
+    acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
+                                (len(test_users[idx]) + len(skew_users4[idx])))
+    test_addition_time = time.time() - test_addition_start_time
+    test_time += test_addition_time
+
     # before start next round, record the time
     filename = "result-record_" + uuid + ".txt"
     # first time clean the file
@@ -354,12 +383,16 @@ async def next_round(data, uuid, epochs):
                                + " <Test Time> " + str(test_time)[:8]
                                + " <Communication Time> " + str(communication_time)[:8]
                                + " <Alpha> " + str(alpha)[:8]
-                               + " <Accuracy> " + str(accuracy)[:8]
+                               + " <acc_local> " + str(acc_local.item())[:8]
+                               + " <acc_local_skew1> " + str(acc_local_skew1.item())[:8]
+                               + " <acc_local_skew2> " + str(acc_local_skew2.item())[:8]
+                               + " <acc_local_skew3> " + str(acc_local_skew3.item())[:8]
+                               + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
-        print("##### Epoch #", new_epochs, " start now. #####")
+        print("####################\nEpoch #", new_epochs, " start now\n####################")
         # reset a new time for next round
-        await train(data, uuid, new_epochs, time.time())
+        asyncio.ensure_future(train(data, uuid, new_epochs, time.time()))
     else:
         print("##########\nALL DONE!\n##########")
 
@@ -404,11 +437,12 @@ class MainHandler(web.RequestHandler):
         if message == "test":
             test(data.get("data"))
         elif message == "prepare":
-            await train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time())
+            asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
         elif message == "average":
-            await average(data.get("data"), data.get("uuid"), data.get("epochs"))
+            asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "alpha":
-            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"))
+            asyncio.ensure_future(next_round(data.get("data"), data.get("uuid"), data.get("epochs")))
+        return
 
 
 async def train_count(epochs, uuid, start_time, train_time):
@@ -429,8 +463,7 @@ async def train_count(epochs, uuid, start_time, train_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
-        print(response)
+        await http_client_post(blockchain_server_url, json_body, 'train_ready')
     else:
         lock.release()
 
@@ -451,8 +484,7 @@ async def negotiate_count(epochs, uuid, test_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        response = await http_client_post(blockchain_server_url, json_body, 'train_ready')
-        print(response)
+        await http_client_post(blockchain_server_url, json_body, 'train_ready')
     else:
         lock.release()
 
@@ -462,8 +494,6 @@ async def fetch_time(uuid, epochs):
     start_time = g_start_time.get(key)
     train_time = g_train_time.get(key)
     test_time = g_test_time.get(key)
-    print("get start time for: " + key)
-    print(start_time)
     detail = {
         "start_time": start_time,
         "train_time": train_time,
@@ -482,9 +512,10 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
+            asyncio.ensure_future(train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
+                                              data.get("train_time")))
         elif message == "negotiate_ready":
-            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
+            asyncio.ensure_future(negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time")))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 

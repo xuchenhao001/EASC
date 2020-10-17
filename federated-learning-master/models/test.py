@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 from models.Update import DatasetSplit
 
 
-def test_img(net_g, datatest, args, idx=None):
+def test_img(net_g, datatest, test_indices, args):
     net_g.eval()
     # testing
     test_loss = 0
     correct = 0
-    data_loader = DataLoader(DatasetSplit(datatest, idx), batch_size=args.bs)
+    data_loader = DataLoader(DatasetSplit(datatest, test_indices), batch_size=args.bs)
     l = len(data_loader)
     for idx, (data, target) in enumerate(data_loader):
         if args.gpu != -1:
