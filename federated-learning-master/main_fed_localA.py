@@ -238,8 +238,8 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         start_time = time.time()
         if (iter + 1) % 10 == 0:  # update global model
             from_ip = get_ip()
-            await upload_local_w(user_id, iter, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara,
-                                 start_time)
+            asyncio.ensure_future(upload_local_w(user_id, iter, from_ip, w_glob_local, w_locals, w_locals_per,
+                                                 hyperpara, start_time))
             return
 
     print("##########\nALL DONE!\n##########")
@@ -261,6 +261,8 @@ class MultiTrainThread(Thread):
         time.sleep(start_wait_time)
         print("start new thread")
         loop = asyncio.new_event_loop()
+        if self.start_time is None:
+            self.start_time = time.time()
         loop.run_until_complete(train(self.user_id, self.epochs, self.w_glob_local, self.w_locals, self.w_locals_per,
                                       self.hyperpara, self.start_time))
         print("end thread")
@@ -471,7 +473,7 @@ if __name__ == "__main__":
     # multi-thread training here
     threads = []
     for i in range(thread_num):
-        thread_train = MultiTrainThread(None, None, None, None, None, None, time.time())
+        thread_train = MultiTrainThread(None, None, None, None, None, None, None)
         threads.append(thread_train)
 
     # Start all threads
