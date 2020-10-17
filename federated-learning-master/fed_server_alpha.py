@@ -376,7 +376,7 @@ async def next_round(data, uuid, epochs):
     if new_epochs > 0:
         print("####################\nEpoch #", new_epochs, " start now\n####################")
         # reset a new time for next round
-        asyncio.ensure_future(train(data, uuid, new_epochs, time.time()))
+        await train(data, uuid, new_epochs, time.time())
     else:
         print("##########\nALL DONE!\n##########")
 
@@ -421,11 +421,11 @@ class MainHandler(web.RequestHandler):
         if message == "test":
             test(data.get("data"))
         elif message == "prepare":
-            asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
+            await train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time())
         elif message == "average":
-            asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
+            await average(data.get("data"), data.get("uuid"), data.get("epochs"))
         elif message == "alpha":
-            asyncio.ensure_future(next_round(data.get("data"), data.get("uuid"), data.get("epochs")))
+            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"))
         return
 
 
@@ -496,10 +496,9 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            asyncio.ensure_future(train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
-                                              data.get("train_time")))
+            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
         elif message == "negotiate_ready":
-            asyncio.ensure_future(negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time")))
+            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 

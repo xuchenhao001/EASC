@@ -500,8 +500,7 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
-                                              data.get("train_time"))
+            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
         elif message == "negotiate_ready":
             await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "fetch_time":
