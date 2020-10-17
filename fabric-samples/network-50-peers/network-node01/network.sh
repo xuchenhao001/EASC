@@ -222,14 +222,10 @@ function networkUp() {
 
 function releaseCerts() {
   tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
-  cd ~/EASC/federated-learning-master/
-  nohup python3 -u fed_server.py > server_10.137.3.70.log 2>&1 &
-  cd -
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
     scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-50-peers/network-node${index}/peerOrganizations.tar.gz
     ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-50-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
-    ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
   done
   rm -f peerOrganizations.tar.gz
 }
@@ -286,12 +282,9 @@ function networkDown() {
   rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
   rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
-  # kill python process
-  kill -9 $(ps -ef|grep '[f]ed_server.py' | awk '{print $2}')
-
   for i in ${!AllNodesAddrs[@]}; do
     index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-50-peers/network-node${index} && ./network.sh down && rm -rf organizations/ && kill -9 \$(ps -ef|grep '[f]ed_server.py'|awk '{print \$2}')"
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-50-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
   done
 }
 
