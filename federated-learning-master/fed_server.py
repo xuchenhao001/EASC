@@ -337,6 +337,33 @@ async def next_round(data, uuid, epochs):
     print(start_time)
     test_time = detail.get("test_time")
     train_time = detail.get("train_time")
+
+    # finally, test the acc_local, acc_local_skew1~4
+    net_glob.load_state_dict(w_local2)
+    net_glob.eval()
+    test_addition_start_time = time.time()
+    idx = int(uuid) - 1
+    correct_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
+    acc_local = torch.div(100.0 * correct_test, len(test_users[idx]))
+    # skew 5%
+    correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[idx], args)
+    acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
+                                (len(test_users[idx]) + len(skew_users1[idx])))
+    # skew 10%
+    correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[idx], args)
+    acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
+                                (len(test_users[idx]) + len(skew_users2[idx])))
+    # skew 15%
+    correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[idx], args)
+    acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
+                                (len(test_users[idx]) + len(skew_users3[idx])))
+    # skew 20%
+    correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[idx], args)
+    acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
+                                (len(test_users[idx]) + len(skew_users4[idx])))
+    test_addition_time = time.time() - test_addition_start_time
+    test_time += test_addition_time
+
     # before start next round, record the time
     filename = "result-record_" + uuid + ".txt"
     # first time clean the file
@@ -354,7 +381,11 @@ async def next_round(data, uuid, epochs):
                                + " <Test Time> " + str(test_time)[:8]
                                + " <Communication Time> " + str(communication_time)[:8]
                                + " <Alpha> " + str(alpha)[:8]
-                               + " <Accuracy> " + str(accuracy)[:8]
+                               + " <acc_local> " + str(acc_local.item())[:8]
+                               + " <acc_local_skew1> " + str(acc_local_skew1.item())[:8]
+                               + " <acc_local_skew2> " + str(acc_local_skew2.item())[:8]
+                               + " <acc_local_skew3> " + str(acc_local_skew3.item())[:8]
+                               + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
         print("####################\nEpoch #", new_epochs, " start now\n####################")
