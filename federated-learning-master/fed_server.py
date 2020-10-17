@@ -20,15 +20,13 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
-from models.test import test_img
+from models.test import test_img, test_img_total
 
 from tornado import httpclient, ioloop, web
 
 np.random.seed(0)
 
 # TO BE CHANGED
-# user number in cluster
-user_number = 10
 # alpha minimum
 hyperpara_min = 0.5
 # alpha maximum
@@ -112,11 +110,11 @@ def init():
         # sample users
         if args.iid:
             # dict_users = mnist_iid(dataset_train, 1)
-            dict_users = mnist_iid(dataset_train, user_number)
+            dict_users = mnist_iid(dataset_train, args.num_users)
         else:
             dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
                                                                                                         dataset_test,
-                                                                                                        user_number)
+                                                                                                        args.num_users)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -124,18 +122,18 @@ def init():
         dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
         if args.iid:
             # dict_users = cifar_iid(dataset_train, 1)
-            dict_users = cifar_iid(dataset_train, user_number)
+            dict_users = cifar_iid(dataset_train, args.num_users)
         else:
             dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
                                                                                                         dataset_test,
-                                                                                                        user_number)
+                                                                                                        args.num_users)
             # exit('Error: only consider IID setting in CIFAR10')
     else:
         exit('Error: unrecognized dataset')
     img_size = dataset_train[0][0].shape
 
-    m = max(int(args.frac * user_number), 1)
-    idxs_users = np.random.choice(range(user_number), m, replace=False)
+    m = max(int(args.frac * args.num_users), 1)
+    idxs_users = np.random.choice(range(args.num_users), m, replace=False)
 
     # build model, init part
     if args.model == 'cnn' and args.dataset == 'cifar':
@@ -149,7 +147,6 @@ def init():
         net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
     else:
         exit('Error: unrecognized model')
-    print(net_glob)
     net_glob.train()
 
 
@@ -164,7 +161,7 @@ async def prepare():
         'message': 'prepare',
         'data': {
             'w_glob': w_glob,
-            'user_number': user_number,
+            'user_number': args.num_users,
         },
         'epochs': total_epochs
     }
@@ -334,9 +331,7 @@ async def next_round(data, uuid, epochs):
     response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
-    print(detail)
     start_time = detail.get("start_time")
-    print(start_time)
     test_time = detail.get("test_time")
     train_time = detail.get("train_time")
 
@@ -345,24 +340,17 @@ async def next_round(data, uuid, epochs):
     net_glob.eval()
     test_addition_start_time = time.time()
     idx = int(uuid) - 1
-    correct_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
-    acc_local = torch.div(100.0 * correct_test, len(test_users[idx]))
+    idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+    correct = test_img_total(net_glob, dataset_test, idx_total, args)
+    acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
     # skew 5%
-    correct_skew1, loss_skew1 = test_img(net_glob, dataset_test, skew_users1[idx], args)
-    acc_local_skew1 = torch.div(100.0 * (correct_skew1 + correct_test),
-                                (len(test_users[idx]) + len(skew_users1[idx])))
+    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
     # skew 10%
-    correct_skew2, loss_skew2 = test_img(net_glob, dataset_test, skew_users2[idx], args)
-    acc_local_skew2 = torch.div(100.0 * (correct_skew2 + correct_test),
-                                (len(test_users[idx]) + len(skew_users2[idx])))
+    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
     # skew 15%
-    correct_skew3, loss_skew3 = test_img(net_glob, dataset_test, skew_users3[idx], args)
-    acc_local_skew3 = torch.div(100.0 * (correct_skew3 + correct_test),
-                                (len(test_users[idx]) + len(skew_users3[idx])))
+    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
     # skew 20%
-    correct_skew4, loss_skew4 = test_img(net_glob, dataset_test, skew_users4[idx], args)
-    acc_local_skew4 = torch.div(100.0 * (correct_skew4 + correct_test),
-                                (len(test_users[idx]) + len(skew_users4[idx])))
+    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
     test_addition_time = time.time() - test_addition_start_time
     test_time += test_addition_time
 
@@ -454,7 +442,7 @@ async def train_count(epochs, uuid, start_time, train_time):
     key = str(uuid) + "-" + str(epochs)
     g_start_time[key] = start_time
     g_train_time[key] = train_time
-    if train_count_num == user_number:
+    if train_count_num == args.num_users:
         train_count_num = 0
         lock.release()
         trigger_data = {
@@ -475,7 +463,7 @@ async def negotiate_count(epochs, uuid, test_time):
     negotiate_count_num += 1
     key = str(uuid) + "-" + str(epochs)
     g_test_time[key] = test_time
-    if negotiate_count_num == user_number:
+    if negotiate_count_num == args.num_users:
         negotiate_count_num = 0
         lock.release()
         trigger_data = {

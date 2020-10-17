@@ -34,13 +34,18 @@ def test_img(net_g, datatest, test_indices, args):
     return accuracy, test_loss
 
 
-def test_img_idx(net_g, dataset_test, idx, args):
+def test_img_total(net_g, dataset_test, idx_list, args):
     net_g.eval()
+    subset_idx = [0]
+    idx_total = []
+    for i in range(len(idx_list)):
+        subset_idx.append(subset_idx[-1] + len(idx_list[i]))
+        idx_total += idx_list[i]
 
-    test_loss = 0
-    correct = 0
+    test_loss = [0] * len(idx_list)
+    correct = [0] * len(idx_list)
 
-    dataset = DatasetSplit(dataset_test, idx)
+    dataset = DatasetSplit(dataset_test, idx_total)
     data_loader = DataLoader(dataset, batch_size=args.bs)
 
     y_target = []
@@ -59,10 +64,5 @@ def test_img_idx(net_g, dataset_test, idx, args):
 
     for i in range(len(idx_list)):
         correct[i] = sum(y_target[subset_idx[i]:subset_idx[i + 1]] == y_pred[subset_idx[i]:subset_idx[i + 1]])
-    correct = sum(y_target[subset_idx[i]:subset_idx[i + 1]] == y_pred[subset_idx[i]:subset_idx[i + 1]])
-
-    test_loss /= len(data_loader.dataset)
-    accuracy = 100.00 * correct / len(data_loader.dataset)
 
     return correct
-
