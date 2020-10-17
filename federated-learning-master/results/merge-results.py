@@ -24,7 +24,7 @@ for r in range(round_num):
     for user_id in range(user_number):
         record = lines[user_id][r]
         record_trim = record[13:]
-        numbers_str = re.findall(r"[-+]?\d*\.\d+|\d+", record_trim)
+        numbers_str = re.findall(r"[-+]?\d*\.\d+|\d+ ", record_trim)
         numbers = [float(s) for s in numbers_str]
         round_gather_list.append(numbers)
     data = np.array(round_gather_list)
