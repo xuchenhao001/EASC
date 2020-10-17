@@ -224,6 +224,8 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
             current_time = time.strftime("%H:%M:%S", time.localtime())
             total_time = time.time() - start_time
             communication_time = total_time - train_time - test_time
+            if communication_time < 0.001:
+                communication_time = 0.0
             time_record_file.write(current_time + "[" + f"{iter + 1:0>2}" + "]"
                                    + " <Total Time> " + str(total_time)[:8]
                                    + " <Train Time> " + str(train_time)[:8]
