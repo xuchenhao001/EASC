@@ -12,14 +12,14 @@ function cleanResults() {
 }
 
 function restartService() {
-	kill -9 $(ps -ef|grep '[m]ain_fed_localA.py' | awk '{print $2}')
+	kill -9 $(ps -ef|grep '[m]ain_nn.py' | awk '{print $2}')
 	cd ~/EASC/federated-learning-master/
-	nohup python3 -u main_fed_localA.py > server_10.137.3.70.log 2>&1 &
+	nohup python3 -u main_nn.py > server_10.137.3.70.log 2>&1 &
 	cd -
 	for i in ${!AllNodesAddrs[@]}; do
 		index=$(printf "%02d" $((i+2)))
-		ssh ubuntu@${AllNodesAddrs[$i]} " kill -9 \$(ps -ef|grep '[m]ain_fed_localA.py'|awk '{print \$2}')"
-		ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u main_fed_localA.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
+		ssh ubuntu@${AllNodesAddrs[$i]} " kill -9 \$(ps -ef|grep '[m]ain_nn.py'|awk '{print \$2}')"
+		ssh ubuntu@${AllNodesAddrs[$i]} "(cd ~/EASC/federated-learning-master/; python3 -u main_nn.py) > server_${AllNodesAddrs[$i]}.log 2>&1 &"
 	done
 }
 
