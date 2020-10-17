@@ -288,7 +288,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'negotiate'))
+    await http_client_post(blockchain_server_url, json_body, 'negotiate')
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
@@ -296,7 +296,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         'test_time': test_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(trigger_url, json_body, 'negotiate_ready'))
+    await http_client_post(trigger_url, json_body, 'negotiate_ready')
 
 
 # STEP #7
