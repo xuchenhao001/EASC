@@ -58,8 +58,8 @@ How to start & stop this project.
 ### Blockchain
 
 ```bash
-cd fabric-samples/test-network/
-./network.sh up createChannel -ca -s couchdb && ./network.sh deployCC
+cd fabric-samples/network-10-peers/network-node01/
+./network.sh up createChannel && ./network.sh deployCC
 ```
 
 To stop your blockchain network:
