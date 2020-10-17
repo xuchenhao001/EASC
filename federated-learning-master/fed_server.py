@@ -39,6 +39,8 @@ negotiate_round = 10
 total_epochs = 50
 blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
 trigger_url = "http://10.137.3.70:8888/trigger"
+# blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
+# trigger_url = "http://localhost:8888/trigger"
 # TO BE CHANGED FINISHED
 args = None
 net_glob = None
@@ -167,7 +169,7 @@ async def prepare():
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'prepare'))
+    await http_client_post(blockchain_server_url, json_body, 'prepare')
 
 
 # STEP #3
@@ -193,7 +195,7 @@ async def train(data, uuid, epochs, start_time):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'train'))
+    await http_client_post(blockchain_server_url, json_body, 'train')
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
@@ -202,7 +204,7 @@ async def train(data, uuid, epochs, start_time):
         'train_time': train_time,
     }
     json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(trigger_url, json_body, 'train_ready'))
+    await http_client_post(trigger_url, json_body, 'train_ready')
 
 
 # STEP #4
@@ -228,7 +230,7 @@ async def average(w_map, uuid, epochs):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'w_glob'))
+    await http_client_post(blockchain_server_url, json_body, 'w_glob')
     # start new thread for step #5
     thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
     thread_negotiate.start()
@@ -461,7 +463,7 @@ async def train_count(epochs, uuid, start_time, train_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'train_ready'))
+        await http_client_post(blockchain_server_url, json_body, 'train_ready')
     else:
         lock.release()
 
@@ -482,7 +484,7 @@ async def negotiate_count(epochs, uuid, test_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        asyncio.ensure_future(http_client_post(blockchain_server_url, json_body, 'train_ready'))
+        await http_client_post(blockchain_server_url, json_body, 'train_ready')
     else:
         lock.release()
 
