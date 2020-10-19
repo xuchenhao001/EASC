@@ -76,10 +76,10 @@ async def http_client_post(url, json_body, message="None"):
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
-        print("[HTTP Success] [" + message + "] SERVICE RESPONSE: %s" % response.body)
+        print("[HTTP Success] [" + message + "] from " + url + " SERVICE RESPONSE: %s" % response.body)
         return response.body
     except Exception as e:
-        print("[HTTP Error] [" + message + "] SERVICE RESPONSE: %s" % e)
+        print("[HTTP Error] [" + message + "] from " + url + " SERVICE RESPONSE: %s" % e)
         return None
 
 
@@ -166,7 +166,7 @@ async def prepare():
         'epochs': total_epochs
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'prepare')
+    await http_client_post(blockchain_server_url, json_body, 'prepare_bc')
 
 
 # STEP #3
@@ -192,7 +192,7 @@ async def train(data, uuid, epochs, start_time):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'train')
+    await http_client_post(blockchain_server_url, json_body, 'train_bc')
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
@@ -227,7 +227,7 @@ async def average(w_map, uuid, epochs):
         'epochs': epochs,
     }
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'w_glob')
+    await http_client_post(blockchain_server_url, json_body, 'w_glob_bc')
     # start new thread for step #5
     thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
     thread_negotiate.start()
@@ -287,7 +287,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'negotiate')
+    await http_client_post(blockchain_server_url, json_body, 'negotiate_bc')
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
@@ -328,7 +328,7 @@ async def next_round(data, uuid, epochs):
         'epochs': epochs,
     }
     json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'negotiate_ready')
+    response = await http_client_post(trigger_url, json_body, 'fetch_time')
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     start_time = detail.get("start_time")
@@ -451,7 +451,7 @@ async def train_count(epochs, uuid, start_time, train_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        await http_client_post(blockchain_server_url, json_body, 'train_ready')
+        await http_client_post(blockchain_server_url, json_body, 'train_ready_bc')
     else:
         lock.release()
 
@@ -472,7 +472,7 @@ async def negotiate_count(epochs, uuid, test_time):
         }
         json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
             'utf8')
-        await http_client_post(blockchain_server_url, json_body, 'train_ready')
+        await http_client_post(blockchain_server_url, json_body, 'negotiate_ready_bc')
     else:
         lock.release()
 
