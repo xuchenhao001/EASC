@@ -1,20 +1,14 @@
 #!/bin/bash
-#
-# Copyright IBM Corp All Rights Reserved
-#
-# SPDX-License-Identifier: Apache-2.0
-#
 
-# This script brings up a Hyperledger Fabric network for testing smart contracts
-# and applications. The test network consists of two organizations with one
-# peer each, and a single node Raft ordering service. Users can also use this
-# script to create a channel deploy a chaincode on the channel
-#
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/configtx
 export VERBOSE=false
+
+# AllNodesAddrs=(10.137.3.71 10.137.3.68 10.137.3.20 10.137.3.69 10.137.3.6 10.137.3.23 10.137.3.90 10.137.3.91 10.137.3.88)
+
+source scriptUtils.sh
 
 # Print the usage message
 function printHelp() {
@@ -48,7 +42,7 @@ function printHelp() {
   echo "  network.sh deployCC -l -v -r -d -verbose"
   echo
   echo " Taking all defaults:"
-  echo "	network.sh up"
+  echo "  network.sh up"
   echo
   echo " Examples:"
   echo "  network.sh up createChannel -ca -c mychannel -s couchdb -i 2.0.0"
@@ -126,55 +120,7 @@ function checkPrereqs() {
     fi
   done
 
-  ## Check for fabric-ca
-  if [ "$CRYPTO" == "Certificate Authorities" ]; then
-
-    fabric-ca-client version > /dev/null 2>&1
-    if [[ $? -ne 0 ]]; then
-      echo "ERROR! fabric-ca-client binary not found.."
-      echo
-      echo "Follow the instructions in the Fabric docs to install the Fabric Binaries:"
-      echo "https://hyperledger-fabric.readthedocs.io/en/latest/install.html"
-      exit 1
-    fi
-    CA_LOCAL_VERSION=$(fabric-ca-client version | sed -ne 's/ Version: //p')
-    CA_DOCKER_IMAGE_VERSION=$(docker run --rm hyperledger/fabric-ca:$CA_IMAGETAG fabric-ca-client version | sed -ne 's/ Version: //p' | head -1)
-    echo "CA_LOCAL_VERSION=$CA_LOCAL_VERSION"
-    echo "CA_DOCKER_IMAGE_VERSION=$CA_DOCKER_IMAGE_VERSION"
-
-    if [ "$CA_LOCAL_VERSION" != "$CA_DOCKER_IMAGE_VERSION" ]; then
-      echo "=================== WARNING ======================"
-      echo "  Local fabric-ca binaries and docker images are  "
-      echo "  out of sync. This may cause problems.           "
-      echo "=================================================="
-    fi
-  fi
 }
-
-
-# Before you can bring up a network, each organization needs to generate the crypto
-# material that will define that organization on the network. Because Hyperledger
-# Fabric is a permissioned blockchain, each node and user on the network needs to
-# use certificates and keys to sign and verify its actions. In addition, each user
-# needs to belong to an organization that is recognized as a member of the network.
-# You can use the Cryptogen tool or Fabric CAs to generate the organization crypto
-# material.
-
-# By default, the sample network uses cryptogen. Cryptogen is a tool that is
-# meant for development and testing that can quicky create the certificates and keys
-# that can be consumed by a Fabric network. The cryptogen tool consumes a series
-# of configuration files for each organization in the "organizations/cryptogen"
-# directory. Cryptogen uses the files to generate the crypto  material for each
-# org in the "organizations" directory.
-
-# You can also Fabric CAs to generate the crypto material. CAs sign the certificates
-# and keys that they generate to create a valid root of trust for each organization.
-# The script uses Docker Compose to bring up three CAs, one for each peer organization
-# and the ordering organization. The configuration file for creating the Fabric CA
-# servers are in the "organizations/fabric-ca" directory. Within the same diectory,
-# the "registerEnroll.sh" script uses the Fabric CA client to create the identites,
-# certificates, and MSP folders that are needed to create the test network in the
-# "organizations/ordererOrganizations" directory.
 
 # Create Organziation crypto material using cryptogen or CAs
 function createOrgs() {
@@ -187,129 +133,51 @@ function createOrgs() {
   if [ "$CRYPTO" == "cryptogen" ]; then
     which cryptogen
     if [ "$?" -ne 0 ]; then
-      echo "cryptogen tool not found. exiting"
-      exit 1
+      fatalln "cryptogen tool not found. exiting"
     fi
-    echo
-    echo "##########################################################"
-    echo "##### Generate certificates using cryptogen tool #########"
-    echo "##########################################################"
-    echo
+    infoln "Generate certificates using cryptogen tool"
 
-    echo "##########################################################"
-    echo "############ Create Org1 Identities ######################"
-    echo "##########################################################"
+    infoln "Create Orgs Identities"
 
     set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-org1.yaml --output="organizations"
+    cryptogen generate --config=./organizations/crypto-config.yaml --output="organizations"
     res=$?
-    set +x
+    { set +x; } 2>/dev/null
     if [ $res -ne 0 ]; then
-      echo "Failed to generate certificates..."
-      exit 1
+      fatalln "Failed to generate certificates..."
     fi
 
-    echo "##########################################################"
-    echo "############ Create Org2 Identities ######################"
-    echo "##########################################################"
-
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-org2.yaml --output="organizations"
-    res=$?
-    set +x
-    if [ $res -ne 0 ]; then
-      echo "Failed to generate certificates..."
-      exit 1
-    fi
-
-    echo "##########################################################"
-    echo "############ Create Orderer Org Identities ###############"
-    echo "##########################################################"
-
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-orderer.yaml --output="organizations"
-    res=$?
-    set +x
-    if [ $res -ne 0 ]; then
-      echo "Failed to generate certificates..."
-      exit 1
-    fi
-
-    CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem)
-    CERT=$(echo $CERT | sed 's/\//\\\//g')
-    PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/priv_sk)
-    PRIK=$(echo $PRIK | sed 's/\//\\\//g')
-    sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" ./organizations/wallet-template.json > appUser.id
-    mkdir -p ../../blockchain-server/routes/rest/wallet/
-    mv appUser.id ../../blockchain-server/routes/rest/wallet/
-
-  fi
-
-  # Create crypto material using Fabric CAs
-  if [ "$CRYPTO" == "Certificate Authorities" ]; then
-
-    echo
-    echo "##########################################################"
-    echo "##### Generate certificates using Fabric CA's ############"
-    echo "##########################################################"
-
-    IMAGE_TAG=${CA_IMAGETAG} docker-compose -f $COMPOSE_FILE_CA up -d 2>&1
-
-    . organizations/fabric-ca/registerEnroll.sh
-
-    sleep 10
-
-    echo "##########################################################"
-    echo "############ Create Org1 Identities ######################"
-    echo "##########################################################"
-
-    createOrg1
-
-    echo "##########################################################"
-    echo "############ Create Org2 Identities ######################"
-    echo "##########################################################"
-
-    createOrg2
-
-    echo "##########################################################"
-    echo "############ Create Orderer Org Identities ###############"
-    echo "##########################################################"
-
-    createOrderer
-
+    prepare-wallet org1 Org1MSP
+    prepare-wallet org2 Org2MSP
   fi
 
   echo
-  echo "Generate CCP files for Org1 and Org2"
+  echo "Generate CCP files for Orgs"
   ./organizations/ccp-generate.sh
-  cp organizations/peerOrganizations/org1.example.com/connection-org1.json ../../blockchain-server/routes/rest/wallet/connection-org1.json
+  prepare-ccp org1
+  prepare-ccp org2
 }
 
-# Once you create the organization crypto material, you need to create the
-# genesis block of the orderer system channel. This block is required to bring
-# up any orderer nodes and create any application channels.
+# USING_ORG=org1
+function prepare-wallet() {
+  USING_ORG=$1
+  MSPID=$2
+  CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/signcerts/User1@${USING_ORG}.example.com-cert.pem)
+  CERT=$(echo $CERT | sed 's/\//\\\//g')
+  PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/keystore/priv_sk)
+  PRIK=$(echo $PRIK | sed 's/\//\\\//g')
+  sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" -e "s/MSPID/${MSPID}/g" ./organizations/wallet-template.json > ${USING_ORG}.id
+  # mkdir -p ../../../blockchain-server/routes/rest/wallet/
+  mkdir -p ../../blockchain-server/routes/rest/wallet/
+  # mv ${USING_ORG}.id ../../../blockchain-server/routes/rest/wallet/
+  mv ${USING_ORG}.id ../../blockchain-server/routes/rest/wallet/
+}
 
-# The configtxgen tool is used to create the genesis block. Configtxgen consumes a
-# "configtx.yaml" file that contains the definitions for the sample network. The
-# genesis block is defiend using the "TwoOrgsOrdererGenesis" profile at the bottom
-# of the file. This profile defines a sample consortium, "SampleConsortium",
-# consisting of our two Peer Orgs. This consortium defines which organizations are
-# recognized as members of the network. The peer and ordering organizations are defined
-# in the "Profiles" section at the top of the file. As part of each organization
-# profile, the file points to a the location of the MSP directory for each member.
-# This MSP is used to create the channel MSP that defines the root of trust for
-# each organization. In essense, the channel MSP allows the nodes and users to be
-# recognized as network members. The file also specifies the anchor peers for each
-# peer org. In future steps, this same file is used to create the channel creation
-# transaction and the anchor peer updates.
-#
-#
-# If you receive the following warning, it can be safely ignored:
-#
-# [bccsp] GetDefault -> WARN 001 Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.
-#
-# You can ignore the logs regarding intermediate certs, we are not using them in
-# this crypto implementation.
+function prepare-ccp() {
+  USING_ORG=$1
+  # cp organizations/peerOrganizations/${USING_ORG}.example.com/connection-${USING_ORG}.json ../../../blockchain-server/routes/rest/wallet/connection-${USING_ORG}.json
+  cp organizations/peerOrganizations/${USING_ORG}.example.com/connection-${USING_ORG}.json ../../blockchain-server/routes/rest/wallet/connection-${USING_ORG}.json
+}
 
 # Generate orderer system channel genesis block.
 function createConsortium() {
@@ -363,6 +231,27 @@ function networkUp() {
     echo "ERROR !!!! Unable to start network"
     exit 1
   fi
+
+  # releaseCerts
+  # cleanResults
+}
+
+function releaseCerts() {
+  tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
+  for i in ${!AllNodesAddrs[@]}; do
+    index=$(printf "%02d" $((i+2)))
+    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-10-peers/network-node${index}/peerOrganizations.tar.gz
+    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+  done
+  rm -f peerOrganizations.tar.gz
+}
+
+function cleanResults() {
+  rm -f ~/EASC/federated-learning-master/result-record_*.txt
+  for i in ${!AllNodesAddrs[@]}; do
+    index=$(printf "%02d" $((i+2)))
+    ssh ubuntu@${AllNodesAddrs[$i]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+  done
 }
 
 ## call the script to join create the channel and join the peers of org1 and org2
@@ -403,25 +292,13 @@ function deployCC() {
 
 # Tear down running network
 function networkDown() {
-  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH -f $COMPOSE_FILE_CA down --volumes --remove-orphans
-  # Don't remove the generated artifacts -- note, the ledgers are always removed
-  if [ "$MODE" != "restart" ]; then
-    # Bring down the network, deleting the volumes
-    #Cleanup the chaincode containers
-    clearContainers
-    #Cleanup images
-    removeUnwantedImages
-    # remove orderer block and other channel configuration transactions and certs
-    rm -rf system-genesis-block/*.block organizations/peerOrganizations organizations/ordererOrganizations
-    ## remove fabric ca artifacts
-    rm -rf organizations/fabric-ca/org1/msp organizations/fabric-ca/org1/tls-cert.pem organizations/fabric-ca/org1/ca-cert.pem organizations/fabric-ca/org1/IssuerPublicKey organizations/fabric-ca/org1/IssuerRevocationPublicKey organizations/fabric-ca/org1/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/org2/msp organizations/fabric-ca/org2/tls-cert.pem organizations/fabric-ca/org2/ca-cert.pem organizations/fabric-ca/org2/IssuerPublicKey organizations/fabric-ca/org2/IssuerRevocationPublicKey organizations/fabric-ca/org2/fabric-ca-server.db
-    rm -rf organizations/fabric-ca/ordererOrg/msp organizations/fabric-ca/ordererOrg/tls-cert.pem organizations/fabric-ca/ordererOrg/ca-cert.pem organizations/fabric-ca/ordererOrg/IssuerPublicKey organizations/fabric-ca/ordererOrg/IssuerRevocationPublicKey organizations/fabric-ca/ordererOrg/fabric-ca-server.db
-
-    # remove channel and script artifacts
-    rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
-
-  fi
+  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
+  clearContainers
+  removeUnwantedImages
+  rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
+  rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
+  # clean wallet
+  rm -f ../../blockchain-server/routes/rest/wallet/*
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
@@ -452,7 +329,7 @@ IMAGETAG="latest"
 # default ca image tag
 CA_IMAGETAG="latest"
 # default database
-DATABASE="leveldb"
+DATABASE="couchdb"
 
 # Parse commandline args
 
