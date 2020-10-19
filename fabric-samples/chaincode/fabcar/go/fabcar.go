@@ -147,6 +147,25 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	return nil
 }
 
+func (s *SmartContract) CheckTrainRead(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[CHECK TRAIN READ MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// try to read wMap, if all good, then can go on "train ready".
+	wMap, err := readAsMap(ctx, "wMap", recMsg.Epochs)
+	if err != nil {
+		return fmt.Errorf("failed to read w map from state. %s", err.Error())
+	}
+	if len(wMap) == userNum {
+		fmt.Println("gathered enough w map [" + strconv.Itoa(len(wMap)) + "], can go on to train ready now.")
+	} else {
+		fmt.Println("not gathered enough w map [" + strconv.Itoa(len(wMap)) + "], do nothing.")
+	}
+	return nil
+}
+
 func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
 	fmt.Println("[TRAIN READY MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
@@ -158,19 +177,14 @@ func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, 
 	if err != nil {
 		return fmt.Errorf("failed to read w map from state. %s", err.Error())
 	}
-	if len(wMap) == userNum {
-		fmt.Println("gathered enough w map, send for global_w")
-		// average them, get global_w
-		sendMsg := new(HttpMessage)
-		sendMsg.Message = "average"
-		sendMsg.Data = wMap // send back a w map, the keys are uuids of users
-		sendMsg.Uuid = myuuid
-		sendMsg.Epochs = recMsg.Epochs
-		sendMsgAsBytes, _ := json.Marshal(sendMsg)
-		go sendPostRequest(sendMsgAsBytes, "TRAIN")
-	} else {
-		fmt.Println("not gathered enough w map [" + strconv.Itoa(len(wMap)) + "], do nothing")
-	}
+	// average them, get global_w
+	sendMsg := new(HttpMessage)
+	sendMsg.Message = "average"
+	sendMsg.Data = wMap // send back a w map, the keys are uuids of users
+	sendMsg.Uuid = myuuid
+	sendMsg.Epochs = recMsg.Epochs
+	sendMsgAsBytes, _ := json.Marshal(sendMsg)
+	go sendPostRequest(sendMsgAsBytes, "TRAIN")
 	return nil
 }
 
@@ -206,6 +220,36 @@ func (s *SmartContract) Negotiate(ctx contractapi.TransactionContextInterface, r
 		return fmt.Errorf("failed to update acc_test and alpha map into state. %s", err.Error())
 	}
 
+	return nil
+}
+
+func (s *SmartContract) CheckNegotiateRead(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[CHECK NEGOTIATE READ MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpAccAlphaMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// try to read accAlphaMap, if all good, then can go on "negotiate ready".
+	var accAlphaMap = map[string]AccAlpha{}
+	accAlphaInterface, err := readAsMap(ctx, "accAlphaMap", recMsg.Epochs)
+	if err != nil {
+		return fmt.Errorf("failed to read acc_test and alpha map from state. %s", err.Error())
+	}
+	accAlphaString, err := json.Marshal(accAlphaInterface)
+	if err != nil {
+		return fmt.Errorf("failed to marshal accAlpha interface: %s", err.Error())
+	}
+	err = json.Unmarshal(accAlphaString, &accAlphaMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal accAlpha interface to accAlphaMap: %s", err.Error())
+	}
+	if len(accAlphaMap) == userNum {
+		fmt.Println("gathered enough acc_test and alpha map [" + strconv.Itoa(len(accAlphaMap)) +
+			"], can go on to negotiate ready now.")
+	} else {
+		fmt.Println("not gathered enough acc_test and alpha map [" + strconv.Itoa(len(accAlphaMap)) +
+			"], do nothing.")
+	}
 	return nil
 }
 
