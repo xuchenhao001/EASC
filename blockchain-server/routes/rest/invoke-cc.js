@@ -7,125 +7,13 @@ let log4js = require('log4js');
 let logger = log4js.getLogger('REST');
 logger.level = 'DEBUG';
 
-const FabricCAServices = require('fabric-ca-client');
 const { Gateway, Wallets } = require('fabric-network');
 const fs = require('fs');
 const path = require('path');
 
 let common = require('./common');
 
-let enrollAdmin = async function() {
-  logger.debug("Enroll admin...");
-  try {
-    // load the network configuration
-    const ccpPath = path.resolve(__dirname, 'wallet', 'connection-org1.json');
-    const fileExists = fs.existsSync(ccpPath);
-    if (!fileExists) {
-      throw new Error(`no such file or directory: ${ccpPath}`);
-    }
-    const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
-
-    // Create a new CA client for interacting with the CA.
-    const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-    const caTLSCACerts = caInfo.tlsCACerts.pem;
-    const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
-
-    // Create a new file system based wallet for managing identities.
-    const walletPath = path.join(__dirname, 'wallet');
-    const wallet = await Wallets.newFileSystemWallet(walletPath);
-    logger.info(`Wallet path: ${walletPath}`);
-
-    // Check to see if we've already enrolled the admin user.
-    const identity = await wallet.get('admin');
-    if (identity) {
-      logger.info('An identity for the admin user "admin" already exists in the wallet');
-      return;
-    }
-
-    // Enroll the admin user, and import the new identity into the wallet.
-    const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
-    const x509Identity = {
-      credentials: {
-        certificate: enrollment.certificate,
-        privateKey: enrollment.key.toBytes(),
-      },
-      mspId: 'Org1MSP',
-      type: 'X.509',
-    };
-    await wallet.put('admin', x509Identity);
-    logger.info('Successfully enrolled admin user "admin" and imported it into the wallet');
-
-  } catch (error) {
-    let errMessage = 'Failed to enroll admin user "admin": ' + error;
-    logger.error(errMessage);
-  }
-}
-
-let enrollAppUser = async function() {
-  try {
-    // load the network configuration
-    const ccpPath = path.resolve(__dirname, 'wallet', 'connection-org1.json');
-    const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
-
-    // Create a new CA client for interacting with the CA.
-    const caURL = ccp.certificateAuthorities['ca.org1.example.com'].url;
-    const ca = new FabricCAServices(caURL);
-
-    // Create a new file system based wallet for managing identities.
-    const walletPath = path.join(__dirname, 'wallet');
-    const wallet = await Wallets.newFileSystemWallet(walletPath);
-    logger.info(`Wallet path: ${walletPath}`);
-
-    // Check to see if we've already enrolled the user.
-    const userIdentity = await wallet.get('appUser');
-    if (userIdentity) {
-      logger.info('An identity for the user "appUser" already exists in the wallet');
-      return;
-    }
-
-    // Check to see if we've already enrolled the admin user.
-    let adminIdentity = await wallet.get('admin');
-    if (!adminIdentity) {
-      logger.info('An identity for the user "admin" does not exist in the wallet, enroll it now...');
-      await enrollAdmin();
-      adminIdentity = await wallet.get('admin');
-      if (!adminIdentity) {
-        logger.error('An identity for the user "admin" enroll failed, stop request.');
-        return;
-      }
-    }
-
-    // build a user object for authenticating with the CA
-    const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
-    const adminUser = await provider.getUserContext(adminIdentity, 'admin');
-
-    // Register the user, enroll the user, and import the new identity into the wallet.
-    const secret = await ca.register({
-      affiliation: 'org1.department1',
-      enrollmentID: 'appUser',
-      role: 'client'
-    }, adminUser);
-    const enrollment = await ca.enroll({
-      enrollmentID: 'appUser',
-      enrollmentSecret: secret
-    });
-    const x509Identity = {
-      credentials: {
-        certificate: enrollment.certificate,
-        privateKey: enrollment.key.toBytes(),
-      },
-      mspId: 'Org1MSP',
-      type: 'X.509',
-    };
-    await wallet.put('appUser', x509Identity);
-    logger.info('Successfully registered and enrolled admin user "appUser" and imported it into the wallet');
-
-  } catch (error) {
-    let errMessage = 'Failed to register user "appUser" ' + error;
-    logger.error(errMessage);
-  }
-}
-
+let pickOrg=1
 
 router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
   let channelName = req.params.channelName;
@@ -160,7 +48,7 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
 });
 
 
-router.post('/test/echo', async function (req, res) {
+router.get('/test/echo', async function (req, res) {
   common.responseSuccess(res, req.body);
 });
 
@@ -186,8 +74,10 @@ let invoke = async function(res, channelName, chaincodeName, invokeFuncName, arg
 };
 
 let submitRequest = async function (channelName, chaincodeName, invokeFuncName, args) {
+  // pick an org from ccp first
+  let orgName = pickOrgByCCP();
   // load the network configuration
-  const ccpPath = path.resolve(__dirname, 'wallet', 'connection-org1.json');
+  const ccpPath = path.resolve(__dirname, 'wallet', 'connection-' + orgName + '.json');
   const fileExists = fs.existsSync(ccpPath);
   if (!fileExists) {
     throw new Error(`no such file or directory: ${ccpPath}`);
@@ -200,20 +90,15 @@ let submitRequest = async function (channelName, chaincodeName, invokeFuncName, 
   logger.debug(`Wallet path: ${walletPath}`);
 
   // Check to see if we've already enrolled the user.
-  let identity = await wallet.get('appUser');
+  let identity = await wallet.get(orgName);
   if (!identity) {
-    logger.info('An identity for the user "appUser" does not exist in the wallet, enroll it now...');
-    await enrollAppUser();
-    identity = await wallet.get('appUser');
-    if (!identity) {
-      logger.error('An identity for the user "appUser" enroll failed, stop request.');
-      return;
-    }
+    logger.error('An identity for the user "' + orgName + '" does not exist in the wallet!!!!!');
+    return;
   }
 
   // Create a new gateway for connecting to our peer node.
   const gateway = new Gateway();
-  await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: false } });
+  await gateway.connect(ccp, { wallet, identity: orgName, discovery: { enabled: true, asLocalhost: false } });
 
   // Get the network (channel) our contract is deployed to.
   const network = await gateway.getNetwork(channelName);
@@ -227,6 +112,28 @@ let submitRequest = async function (channelName, chaincodeName, invokeFuncName, 
 
   // Disconnect from the gateway.
   await gateway.disconnect();
+}
+
+// pick org from org1 to the last org
+let pickOrgByCCP = function () {
+  const ccpPath = path.resolve(__dirname, 'wallet');
+  let files = fs.readdirSync(ccpPath);
+  let lastFileName = files.sort(function(a, b) {
+    return a.length - b.length || // sort by length, if equal then
+        a.localeCompare(b);    // sort by dictionary order
+  }).pop();
+  let lastOrg = lastFileName
+      .replace(/^connection-org/, '')
+      .replace(/\.json$/, '');
+  let lastOrgNum = parseInt(lastOrg);
+  if (pickOrg === lastOrgNum) {
+    pickOrg = 1;
+  } else {
+    pickOrg++;
+  }
+  let orgName = "org" + pickOrg;
+  logger.debug("Pick [" + orgName + "] this time!");
+  return orgName;
 }
 
 module.exports = router;
