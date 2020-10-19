@@ -447,11 +447,25 @@ async def train_count(epochs, uuid, start_time, train_time):
         print("Gathered enough train_ready, send to blockchain server. now: " + str(train_count_num))
         train_count_num = 0
         lock.release()
+        # check train read first, since network delay may cause blockchain dirty read.
+        while True:
+            trigger_data = {
+                'message': 'check_train_read',
+                'epochs': epochs,
+            }
+            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
+                'utf8')
+            response = await http_client_post(blockchain_server_url, json_body, 'check_train_read')
+            if response is not None:
+                break
+            time.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+
+        # trigger train_ready
         trigger_data = {
             'message': 'train_ready',
             'epochs': epochs,
         }
-        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
             'utf8')
         await http_client_post(blockchain_server_url, json_body, 'train_ready_bc')
     else:
@@ -468,11 +482,24 @@ async def negotiate_count(epochs, uuid, test_time):
     if negotiate_count_num == args.num_users:
         negotiate_count_num = 0
         lock.release()
+        # check negotiate read first, since network delay may cause blockchain dirty read.
+        while True:
+            trigger_data = {
+                'message': 'check_negotiate_read',
+                'epochs': epochs,
+            }
+            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
+                'utf8')
+            response = await http_client_post(blockchain_server_url, json_body, 'check_negotiate_read')
+            if response is not None:
+                break
+            time.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+
         trigger_data = {
             'message': 'negotiate_ready',
             'epochs': epochs,
         }
-        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
             'utf8')
         await http_client_post(blockchain_server_url, json_body, 'negotiate_ready_bc')
     else:
