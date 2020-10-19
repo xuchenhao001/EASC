@@ -425,11 +425,11 @@ class MainHandler(web.RequestHandler):
         if message == "test":
             test(data.get("data"))
         elif message == "prepare":
-            await train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time())
+            asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
         elif message == "average":
-            await average(data.get("data"), data.get("uuid"), data.get("epochs"))
+            asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "alpha":
-            await next_round(data.get("data"), data.get("uuid"), data.get("epochs"))
+            asyncio.ensure_future(next_round(data.get("data"), data.get("uuid"), data.get("epochs")))
         return
 
 

@@ -327,6 +327,7 @@ func findMinAccVar(accAlphaMap map[string]AccAlpha) float64 {
 }
 
 func sendPostRequest(buf []byte, requestType string) {
+	fmt.Println("SEND REQUEST [" + requestType + "]")
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(buf))
 	if err != nil {
 		fmt.Printf("[Error] failed to send post request to server. %s\n", err.Error())
@@ -334,9 +335,9 @@ func sendPostRequest(buf []byte, requestType string) {
 	}
 	defer resp.Body.Close()
 	if resp != nil {
-		fmt.Println(requestType + ": " + resp.Status)
+		fmt.Println("SEND REQUEST [" + requestType + "]: " + resp.Status)
 	} else {
-		fmt.Println(requestType + ": No reply")
+		fmt.Println("SEND REQUEST [" + requestType + "]: No reply")
 	}
 
 }
