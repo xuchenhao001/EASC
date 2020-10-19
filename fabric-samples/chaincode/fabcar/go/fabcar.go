@@ -169,7 +169,7 @@ func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, 
 		sendMsgAsBytes, _ := json.Marshal(sendMsg)
 		go sendPostRequest(sendMsgAsBytes, "TRAIN")
 	} else {
-		fmt.Println("not gathered enough w map, do nothing")
+		fmt.Println("not gathered enough w map [" + strconv.Itoa(len(wMap)) + "], do nothing")
 	}
 	return nil
 }
@@ -258,7 +258,7 @@ func (s *SmartContract) NegotiateReady(ctx contractapi.TransactionContextInterfa
 
 		go sendPostRequest(sendMsgAsBytes, "NEGOTIATE")
 	} else {
-		fmt.Println("not gathered enough acc_test and alpha, do nothing")
+		fmt.Println("not gathered enough acc_test and alpha [" + strconv.Itoa(len(accAlphaMap)) + "], do nothing")
 	}
 
 	return nil
