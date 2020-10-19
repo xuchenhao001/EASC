@@ -439,10 +439,12 @@ async def train_count(epochs, uuid, start_time, train_time):
     global g_start_time
     global g_train_time
     train_count_num += 1
+    print("Received a train_ready, now: " + str(train_count_num))
     key = str(uuid) + "-" + str(epochs)
     g_start_time[key] = start_time
     g_train_time[key] = train_time
     if train_count_num == args.num_users:
+        print("Gathered enough train_ready, send to blockchain server. now: " + str(train_count_num))
         train_count_num = 0
         lock.release()
         trigger_data = {
