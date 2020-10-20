@@ -564,13 +564,13 @@ async def next_round_count(data, epochs, uuid, from_ip):
         for user_id in ip_map.keys():
             trigger_data = {
                 'message': 'next_round_start',
-                'uuid': uuid,
+                'uuid': user_id,
                 'epochs': epochs - 1,
                 'data': data,
             }
             json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
             my_url = "http://" + ip_map[user_id] + ":8888/trigger"
-            await http_client_post(my_url, json_body, 'next_round_start')
+            asyncio.ensure_future(http_client_post(my_url, json_body, 'next_round_start'))
     else:
         lock.release()
 
