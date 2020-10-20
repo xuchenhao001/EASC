@@ -7,6 +7,7 @@ import gzip
 import json
 import matplotlib
 import time
+import socket
 
 matplotlib.use('Agg')
 import copy
@@ -58,9 +59,11 @@ skew_users3 = None
 skew_users4 = None
 train_count_num = 0
 negotiate_count_num = 0
+next_round_count_num = 0
 g_start_time = {}
 g_train_time = {}
 g_test_time = {}
+ip_map = {}
 
 
 def test(data):
@@ -307,7 +310,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
 
 # STEP #7
 # Federated Learning: with new alpha, train w_local2, restart the round
-async def next_round(data, uuid, epochs):
+async def round_finish(data, uuid, epochs):
     print('received alpha, train new w_glob for uuid: ' + uuid)
     alpha = data.get("alpha")
     accuracy = data.get("accuracy")
@@ -390,13 +393,24 @@ async def next_round(data, uuid, epochs):
                                + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
-        print("SLEEP FOR A WHILE...")
-        time.sleep(20)
-        print("####################\nEpoch #", new_epochs, " start now\n####################")
-        # reset a new time for next round
-        await train(data, uuid, new_epochs, time.time())
+        from_ip = get_ip()
+        body_data = {
+            'message': 'next_round_count',
+            'data': data,
+            'uuid': uuid,
+            'epochs': epochs,
+            'from_ip': from_ip,
+        }
+        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+        await http_client_post(trigger_url, json_body, 'next_round_count')
     else:
         print("##########\nALL DONE!\n##########")
+
+
+async def next_round_start(data, uuid, new_epochs):
+    print("####################\nEpoch #", new_epochs, " start now\n####################")
+    # reset a new time for next round
+    await train(data, uuid, new_epochs, time.time())
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -459,7 +473,7 @@ class MainHandler(web.RequestHandler):
         elif message == "average":
             asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "alpha":
-            asyncio.ensure_future(next_round(data.get("data"), data.get("uuid"), data.get("epochs")))
+            asyncio.ensure_future(round_finish(data.get("data"), data.get("uuid"), data.get("epochs")))
         return
 
 
@@ -536,6 +550,31 @@ async def negotiate_count(epochs, uuid, test_time):
         lock.release()
 
 
+async def next_round_count(data, epochs, uuid, from_ip):
+    lock.acquire()
+    global next_round_count_num
+    next_round_count_num += 1
+    ip_map[uuid] = from_ip
+    if next_round_count_num == args.num_users:
+        # sleep 20 seconds before trigger next round
+        time.sleep(20)
+        next_round_count_num = 0
+        lock.release()
+        # trigger each node of python to next round
+        for user_id in ip_map.keys():
+            trigger_data = {
+                'message': 'next_round_start',
+                'uuid': uuid,
+                'epochs': epochs - 1,
+                'data': data,
+            }
+            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+            my_url = "http://" + ip_map[user_id] + ":8888/trigger"
+            await http_client_post(my_url, json_body, 'next_round_start')
+    else:
+        lock.release()
+
+
 async def fetch_time(uuid, epochs):
     key = str(uuid) + "-" + str(epochs)
     start_time = g_start_time.get(key)
@@ -559,15 +598,35 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
+            asyncio.ensure_future(train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
+                                              data.get("train_time")))
         elif message == "negotiate_ready":
-            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
+            asyncio.ensure_future(negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time")))
+        elif message == "next_round_count":
+            asyncio.ensure_future(next_round_count(data.get("data"), data.get("epochs"), data.get("uuid"),
+                                                   data.get("from_ip")))
+        elif message == "next_round_start":
+            asyncio.ensure_future(next_round_start(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 
         response = {"status": status, "detail": detail}
         in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
         self.write(in_json)
+
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+        print("Detected IP address: " + IP)
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
 
 
 def make_app():
