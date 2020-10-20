@@ -391,6 +391,8 @@ async def next_round(data, uuid, epochs):
                                + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
+        print("SLEEP FOR A WHILE...")
+        time.sleep(15)
         print("####################\nEpoch #", new_epochs, " start now\n####################")
         # reset a new time for next round
         await train(data, uuid, new_epochs, time.time())
