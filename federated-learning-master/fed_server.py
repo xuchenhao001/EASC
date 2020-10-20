@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 import asyncio
-
+import base64
+import gzip
 import json
 import matplotlib
 import time
@@ -156,11 +157,12 @@ async def prepare():
     w_glob = net_glob.state_dict()  # change model to parameters
     # upload w_glob onto blockchian
     convert_tensor_value_to_numpy(w_glob)
-    print("\n\n##### Epoch #", total_epochs, " start now. #####\n")
+    w_glob_compressed = compress_data(w_glob)
+    print("####################\nEpoch #", total_epochs, " start now\n####################")
     body_data = {
         'message': 'prepare',
         'data': {
-            'w_glob': w_glob,
+            'w_glob': w_glob_compressed,
             'user_number': args.num_users,
         },
         'epochs': total_epochs
@@ -174,8 +176,9 @@ async def prepare():
 async def train(data, uuid, epochs, start_time):
     print('train data now for user: ' + uuid)
     w_glob = data.get("w_glob")
-    conver_json_value_to_tensor(w_glob)
-    net_glob.load_state_dict(w_glob)
+    decompressed_w_glob = decompress_data(w_glob)
+    conver_json_value_to_tensor(decompressed_w_glob)
+    net_glob.load_state_dict(decompressed_w_glob)
 
     idx = int(uuid) - 1
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
@@ -183,10 +186,11 @@ async def train(data, uuid, epochs, start_time):
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
     train_time = time.time() - train_start_time
     convert_tensor_value_to_numpy(w)
+    w_compressed = compress_data(w)
     body_data = {
         'message': 'train',
         'data': {
-            'w': w,
+            'w': w_compressed,
         },
         'uuid': uuid,
         'epochs': epochs,
@@ -211,17 +215,21 @@ async def average(w_map, uuid, epochs):
     wArray = []
     for i in w_map.keys():
         w = w_map[i].get("w")
-        conver_json_value_to_tensor(w)
-        wArray.append(w)
+        decompressed_w = decompress_data(w)
+        conver_json_value_to_tensor(decompressed_w)
+        wArray.append(decompressed_w)
     w_glob = FedAvg(wArray)
     w_local = w_map[uuid].get("w")
+    decompressed_w_local = decompress_data(w_local)
+    conver_json_value_to_tensor(decompressed_w_local)
 
     # upload w_glob to blockchain here
     convert_tensor_value_to_numpy(w_glob)
+    w_glob_compressed = compress_data(w_glob)
     body_data = {
         'message': 'w_glob',
         'data': {
-            'w_glob': w_glob,
+            'w_glob': w_glob_compressed,
         },
         'uuid': uuid,
         'epochs': epochs,
@@ -229,7 +237,7 @@ async def average(w_map, uuid, epochs):
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
     await http_client_post(blockchain_server_url, json_body, 'w_glob_bc')
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, decompressed_w_local, epochs)
     thread_negotiate.start()
 
 
@@ -247,7 +255,6 @@ class myNegotiateThread(Thread):
         print("start my negotiate thread: " + self.my_uuid)
         loop = asyncio.new_event_loop()
         loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs))
-        # negotiate(self.my_uuid, self.w_glob, self.w_local)
         print("end my negotiate thread: " + self.my_uuid)
 
 
@@ -308,16 +315,20 @@ async def next_round(data, uuid, epochs):
     w_glob_map = data.get("wGlobMap")
     w_local = w_map[uuid].get("w")
     w_glob = w_glob_map[uuid].get("w_glob")
-    conver_json_value_to_tensor(w_local)
-    conver_json_value_to_tensor(w_glob)
+    decompressed_w_local = decompress_data(w_local)
+    conver_json_value_to_tensor(decompressed_w_local)
+    decompressed_w_glob = decompress_data(w_glob)
+    conver_json_value_to_tensor(decompressed_w_glob)
     # calculate new w_glob (w_local2) according to the alpha
     w_local2 = {}
-    for key in w_glob.keys():
-        w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
+    for key in decompressed_w_glob.keys():
+        w_local2[key] = alpha * decompressed_w_local[key] + (1 - alpha) * decompressed_w_glob[key]
 
     # start next round! Go to STEP #3
+    convert_tensor_value_to_numpy(w_local2)
+    compressed_w_local2 = compress_data(w_local2)
     data = {
-        'w_glob': w_local2,
+        'w_glob': compressed_w_local2,
     }
     # epochs count backwards until 0
     new_epochs = epochs - 1
@@ -336,6 +347,7 @@ async def next_round(data, uuid, epochs):
     train_time = detail.get("train_time")
 
     # finally, test the acc_local, acc_local_skew1~4
+    conver_json_value_to_tensor(w_local2)
     net_glob.load_state_dict(w_local2)
     net_glob.eval()
     test_addition_start_time = time.time()
@@ -400,6 +412,22 @@ def conver_json_value_to_tensor(data):
 def convert_tensor_value_to_numpy(data):
     for key, value in data.items():
         data[key] = value.cpu().numpy()
+
+
+# compress object to base64 string
+def compress_data(data):
+    encoded = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+        'utf8')
+    compressed_data = gzip.compress(encoded)
+    b64_encoded = base64.b64encode(compressed_data)
+    return b64_encoded.decode('ascii')
+
+
+# based64 decode to byte, and then decompress it
+def decompress_data(data):
+    base64_decoded = base64.b64decode(data)
+    decompressed = gzip.decompress(base64_decoded)
+    return json.loads(decompressed)
 
 
 class MainHandler(web.RequestHandler):
