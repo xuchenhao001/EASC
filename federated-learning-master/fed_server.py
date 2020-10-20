@@ -509,8 +509,7 @@ async def train_count(epochs, uuid, start_time, train_time):
             'message': 'train_ready',
             'epochs': epochs,
         }
-        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
-            'utf8')
+        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
         await http_client_post(blockchain_server_url, json_body, 'train_ready_bc')
     else:
         lock.release()
@@ -557,6 +556,7 @@ async def next_round_count(data, epochs, uuid, from_ip):
     ip_map[uuid] = from_ip
     if next_round_count_num == args.num_users:
         # sleep 20 seconds before trigger next round
+        print("SLEEP FOR A WHILE...")
         time.sleep(20)
         next_round_count_num = 0
         lock.release()
@@ -598,15 +598,13 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            asyncio.ensure_future(train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
-                                              data.get("train_time")))
+            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
         elif message == "negotiate_ready":
-            asyncio.ensure_future(negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time")))
+            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "next_round_count":
-            asyncio.ensure_future(next_round_count(data.get("data"), data.get("epochs"), data.get("uuid"),
-                                                   data.get("from_ip")))
+            await next_round_count(data.get("data"), data.get("epochs"), data.get("uuid"), data.get("from_ip"))
         elif message == "next_round_start":
-            asyncio.ensure_future(next_round_start(data.get("data"), data.get("uuid"), data.get("epochs")))
+            await next_round_start(data.get("data"), data.get("uuid"), data.get("epochs"))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 
