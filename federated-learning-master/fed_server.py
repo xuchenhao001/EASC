@@ -279,7 +279,7 @@ async def security_poll(w_compressed_map, uuid, epochs):
     responseObj = json.loads(response)
     sc_responseObj = json.loads(responseObj.get("detail"))
     outlier_list = sc_responseObj.get("detail")
-    print("Get outlier_list: " + ', '.join(outlier_list))
+    print("Get outlier_list: " + ', '.join(str(e) for e in outlier_list))
 
     # STEP 4.2 average w, generate new global_w
     wArray = []
