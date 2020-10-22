@@ -279,14 +279,13 @@ async def security_poll(w_compressed_map, uuid, epochs):
     responseObj = json.loads(response)
     sc_responseObj = json.loads(responseObj.get("detail"))
     outlier_list = sc_responseObj.get("detail")
-    print("Get outlierJudgeResults:")
-    print(outlier_list)
+    print("Get outlier_list: " + ', '.join(outlier_list))
 
     # STEP 4.2 average w, generate new global_w
     wArray = []
     for w_uuid in w_map.keys():
         # filter outliers
-        if w_uuid not in outlier_list:
+        if int(w_uuid) not in outlier_list:
             wArray.append(w_map[w_uuid])
     w_glob = FedAvg(wArray)
     w_local = w_map[uuid]
