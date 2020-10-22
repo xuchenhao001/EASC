@@ -31,7 +31,7 @@ from tornado import httpclient, ioloop, web, gen
 np.random.seed(0)
 
 # TO BE CHANGED
-attackers_id = [2, ]
+attackers_id = []
 # alpha minimum
 hyperpara_min = 0.5
 # alpha maximum
