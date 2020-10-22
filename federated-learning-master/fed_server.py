@@ -8,6 +8,7 @@ import json
 import matplotlib
 import time
 import socket
+import statistics
 
 matplotlib.use('Agg')
 import copy
@@ -24,24 +25,24 @@ from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img, test_img_total
 
-from tornado import httpclient, ioloop, web
+from tornado import httpclient, ioloop, web, gen
 
 np.random.seed(0)
 
 # TO BE CHANGED
+attackers_id = [2,]
 # alpha minimum
 hyperpara_min = 0.5
 # alpha maximum
 hyperpara_max = 0.8
 # rounds to negotiate alpha
 negotiate_round = 10
-# total train round
-total_epochs = 50
 # blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
 # trigger_url = "http://10.137.3.70:8888/trigger"
 blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
 trigger_url = "http://localhost:8888/trigger"
 # TO BE CHANGED FINISHED
+total_epochs = 0
 args = None
 net_glob = None
 dataset_train = None
@@ -58,6 +59,7 @@ skew_users2 = None
 skew_users3 = None
 skew_users4 = None
 train_count_num = 0
+poll_count_num = 0
 negotiate_count_num = 0
 next_round_count_num = 0
 g_start_time = {}
@@ -71,8 +73,9 @@ def test(data):
     return "yes", detail
 
 
-async def http_client_post(url, json_body, message="None"):
-    print("Start http client post [" + message + "] to: " + url)
+async def http_client_post(url, body_data):
+    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    print("Start http client post [" + body_data['message'] + "] to: " + url)
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
@@ -80,10 +83,10 @@ async def http_client_post(url, json_body, message="None"):
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
-        print("[HTTP Success] [" + message + "] from " + url + " SERVICE RESPONSE: %s" % response.body)
+        print("[HTTP Success] [" + body_data['message'] + "] from " + url + " SERVICE RESPONSE: %s" % response.body)
         return response.body
     except Exception as e:
-        print("[HTTP Error] [" + message + "] from " + url + " SERVICE RESPONSE: %s" % e)
+        print("[HTTP Error] [" + body_data['message'] + "] from " + url + " SERVICE RESPONSE: %s" % e)
         return None
 
 
@@ -91,6 +94,7 @@ async def http_client_post(url, json_body, message="None"):
 # Federated Learning: init step
 def init():
     global args
+    global total_epochs
     global net_glob
     global dataset_train
     global dataset_test
@@ -105,6 +109,7 @@ def init():
     # parse args
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
+    total_epochs = args.epochs
 
     # load dataset and split users
     if args.dataset == 'mnist':
@@ -170,8 +175,7 @@ async def prepare():
         },
         'epochs': total_epochs
     }
-    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'prepare_bc')
+    await http_client_post(blockchain_server_url, body_data)
 
 
 # STEP #3
@@ -187,6 +191,8 @@ async def train(data, uuid, epochs, start_time):
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
     train_start_time = time.time()
     w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+    if uuid in attackers_id:
+        w = disturb_w(w)
     train_time = time.time() - train_start_time
     convert_tensor_value_to_numpy(w)
     w_compressed = compress_data(w)
@@ -198,8 +204,7 @@ async def train(data, uuid, epochs, start_time):
         'uuid': uuid,
         'epochs': epochs,
     }
-    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'train_bc')
+    await http_client_post(blockchain_server_url, body_data)
     trigger_data = {
         'message': 'train_ready',
         'epochs': epochs,
@@ -207,24 +212,78 @@ async def train(data, uuid, epochs, start_time):
         'start_time': start_time,
         'train_time': train_time,
     }
-    json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(trigger_url, json_body, 'train_ready')
+    await http_client_post(trigger_url, trigger_data)
 
 
-# STEP #4
-# Federated Learning: average w for w_glob
-async def average(w_map, uuid, epochs):
-    print('received average request.')
-    wArray = []
-    for i in w_map.keys():
-        w = w_map[i].get("w")
+def disturb_w(w):
+    disturbed_w = copy.deepcopy(w)
+    for name, param in w.items():
+        beta = np.random.rand()
+        transformed_w = param * beta
+        disturbed_w[name] = transformed_w
+    return disturbed_w
+
+
+# STEP #4.1
+# Security poll
+async def security_poll(w_compressed_map, uuid, epochs):
+    print('received security poll request.')
+    w_map = {}
+    # calculate loss mean and std
+    for w_uuid in w_compressed_map.keys():
+        w = w_compressed_map[w_uuid].get("w")
         decompressed_w = decompress_data(w)
         conver_json_value_to_tensor(decompressed_w)
-        wArray.append(decompressed_w)
+        w_map[w_uuid] = decompressed_w
+    # test the loss of weight on myself dataset
+    idx = int(uuid) - 1
+    loss_map = {}
+    for w_uuid in w_map.keys():
+        net_glob.load_state_dict(w_map[w_uuid])
+        net_glob.eval()
+        acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
+        loss_map[w_uuid] = loss_test
+    loss_mean = statistics.mean(list(loss_map.values()))
+    loss_std = statistics.stdev(list(loss_map.values()))
+    outlier_line = 2 * loss_std + loss_mean
+    # TODO: just for local test
+    # outlier_line = 0.6
+    # find out outlier loss value
+    outlier_uuid = []
+    for w_uuid in loss_map.keys():
+        if loss_map[w_uuid] > outlier_line:
+            print("!!! Found attacker: " + str(w_uuid) + " with loss: " + str(loss_map[w_uuid]))
+            outlier_uuid.append(w_uuid)
+    body_data = {
+        'message': 'outlier_record',
+        'data': {
+            'outlier_ids': outlier_uuid,
+        },
+        'uuid': uuid,
+        'epochs': epochs,
+    }
+    await http_client_post(blockchain_server_url, body_data)
+    trigger_data = {
+        'message': 'outlier_record_ready',
+        'epochs': epochs,
+        'uuid': uuid,
+    }
+    response = await http_client_post(trigger_url, trigger_data)
+    # first decode from blockchain server, then decode from smart contract
+    responseObj = json.loads(response)
+    sc_responseObj = json.loads(responseObj.get("detail"))
+    outlier_list = sc_responseObj.get("detail")
+    print("Get outlierJudgeResults:")
+    print(outlier_list)
+
+    # STEP 4.2 average w, generate new global_w
+    wArray = []
+    for w_uuid in w_map.keys():
+        # filter outliers
+        if w_uuid not in outlier_list:
+            wArray.append(w_map[w_uuid])
     w_glob = FedAvg(wArray)
-    w_local = w_map[uuid].get("w")
-    decompressed_w_local = decompress_data(w_local)
-    conver_json_value_to_tensor(decompressed_w_local)
+    w_local = w_map[uuid]
 
     # upload w_glob to blockchain here
     convert_tensor_value_to_numpy(w_glob)
@@ -237,11 +296,42 @@ async def average(w_map, uuid, epochs):
         'uuid': uuid,
         'epochs': epochs,
     }
-    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'w_glob_bc')
+    await http_client_post(blockchain_server_url, body_data)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, decompressed_w_local, epochs)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
     thread_negotiate.start()
+
+
+# STEP #4.2
+# Federated Learning: average w for w_glob
+# async def average(w_map, uuid, epochs):
+#     print('received average request.')
+#     wArray = []
+#     for i in w_map.keys():
+#         w = w_map[i].get("w")
+#         decompressed_w = decompress_data(w)
+#         conver_json_value_to_tensor(decompressed_w)
+#         wArray.append(decompressed_w)
+#     w_glob = FedAvg(wArray)
+#     w_local = w_map[uuid].get("w")
+#     decompressed_w_local = decompress_data(w_local)
+#     conver_json_value_to_tensor(decompressed_w_local)
+#
+#     # upload w_glob to blockchain here
+#     convert_tensor_value_to_numpy(w_glob)
+#     w_glob_compressed = compress_data(w_glob)
+#     body_data = {
+#         'message': 'w_glob',
+#         'data': {
+#             'w_glob': w_glob_compressed,
+#         },
+#         'uuid': uuid,
+#         'epochs': epochs,
+#     }
+#     await http_client_post(blockchain_server_url, body_data)
+#     # start new thread for step #5
+#     thread_negotiate = myNegotiateThread(uuid, w_glob, decompressed_w_local, epochs)
+#     thread_negotiate.start()
 
 
 # STEP #5
@@ -296,16 +386,14 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         'epochs': epochs,
     }
     print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
-    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(blockchain_server_url, json_body, 'negotiate_bc')
+    await http_client_post(blockchain_server_url, body_data)
     trigger_data = {
         'message': 'negotiate_ready',
         'epochs': epochs,
         'uuid': my_uuid,
         'test_time': test_time,
     }
-    json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(trigger_url, json_body, 'negotiate_ready')
+    await http_client_post(trigger_url, trigger_data)
 
 
 # STEP #7
@@ -341,8 +429,7 @@ async def round_finish(data, uuid, epochs):
         'uuid': uuid,
         'epochs': epochs,
     }
-    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'fetch_time')
+    response = await http_client_post(trigger_url, fetch_data)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     start_time = detail.get("start_time")
@@ -401,13 +488,21 @@ async def round_finish(data, uuid, epochs):
             'epochs': epochs,
             'from_ip': from_ip,
         }
-        json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-        await http_client_post(trigger_url, json_body, 'next_round_count')
+        await http_client_post(trigger_url, body_data)
     else:
         print("##########\nALL DONE!\n##########")
 
 
 async def next_round_start(data, uuid, new_epochs):
+    # reset counts
+    global train_count_num
+    global poll_count_num
+    global negotiate_count_num
+    global next_round_count_num
+    train_count_num = 0
+    poll_count_num = 0
+    negotiate_count_num = 0
+    next_round_count_num = 0
     print("####################\nEpoch #", new_epochs, " start now\n####################")
     # reset a new time for next round
     await train(data, uuid, new_epochs, time.time())
@@ -470,8 +565,10 @@ class MainHandler(web.RequestHandler):
             test(data.get("data"))
         elif message == "prepare":
             asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
-        elif message == "average":
-            asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
+        elif message == "security_poll":
+            asyncio.ensure_future(security_poll(data.get("data"), data.get("uuid"), data.get("epochs")))
+        # elif message == "average":
+        #     asyncio.ensure_future(average(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "alpha":
             asyncio.ensure_future(round_finish(data.get("data"), data.get("uuid"), data.get("epochs")))
         return
@@ -487,32 +584,59 @@ async def train_count(epochs, uuid, start_time, train_time):
     key = str(uuid) + "-" + str(epochs)
     g_start_time[key] = start_time
     g_train_time[key] = train_time
+    lock.release()
     if train_count_num == args.num_users:
         print("Gathered enough train_ready, send to blockchain server. now: " + str(train_count_num))
-        train_count_num = 0
-        lock.release()
         # check train read first, since network delay may cause blockchain dirty read.
         while True:
             trigger_data = {
                 'message': 'check_train_read',
                 'epochs': epochs,
             }
-            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
-                'utf8')
-            response = await http_client_post(blockchain_server_url, json_body, 'check_train_read')
+            response = await http_client_post(blockchain_server_url, trigger_data)
             if response is not None:
                 break
-            time.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+            await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
 
         # trigger train_ready
         trigger_data = {
             'message': 'train_ready',
             'epochs': epochs,
         }
-        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-        await http_client_post(blockchain_server_url, json_body, 'train_ready_bc')
-    else:
-        lock.release()
+        await http_client_post(blockchain_server_url, trigger_data)
+
+
+# This is a blocking process until blockchain returns poll results
+async def poll_count(epochs, uuid):
+    lock.acquire()
+    global poll_count_num
+    poll_count_num += 1
+    print("Received a outlier_record_ready from " + str(uuid) + ", now: " + str(poll_count_num))
+    lock.release()
+    while True:
+        if poll_count_num == args.num_users:
+            print("Gathered enough outlier_record_ready, send to blockchain server. now: " + str(poll_count_num))
+            # check train read first, since network delay may cause blockchain dirty read.
+            while True:
+                trigger_data = {
+                    'message': 'check_poll_read',
+                    'epochs': epochs,
+                }
+                response = await http_client_post(blockchain_server_url, trigger_data)
+                if response is not None:
+                    break
+                await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+
+            # get poll results, and go back continue to average w
+            trigger_data = {
+                'message': 'poll_ready',
+                'epochs': epochs,
+            }
+            result = await http_client_post(blockchain_server_url, trigger_data)
+            return result.decode("utf-8")
+        else:
+            # if not enough poll gathered, sleep for 1 second then retry.
+            await gen.sleep(1)
 
 
 async def negotiate_count(epochs, uuid, test_time):
@@ -522,31 +646,24 @@ async def negotiate_count(epochs, uuid, test_time):
     negotiate_count_num += 1
     key = str(uuid) + "-" + str(epochs)
     g_test_time[key] = test_time
+    lock.release()
     if negotiate_count_num == args.num_users:
-        negotiate_count_num = 0
-        lock.release()
         # check negotiate read first, since network delay may cause blockchain dirty read.
         while True:
             trigger_data = {
                 'message': 'check_negotiate_read',
                 'epochs': epochs,
             }
-            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
-                'utf8')
-            response = await http_client_post(blockchain_server_url, json_body, 'check_negotiate_read')
+            response = await http_client_post(blockchain_server_url, trigger_data)
             if response is not None:
                 break
-            time.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+            await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
 
         trigger_data = {
             'message': 'negotiate_ready',
             'epochs': epochs,
         }
-        json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode(
-            'utf8')
-        await http_client_post(blockchain_server_url, json_body, 'negotiate_ready_bc')
-    else:
-        lock.release()
+        await http_client_post(blockchain_server_url, trigger_data)
 
 
 async def next_round_count(data, epochs, uuid, from_ip):
@@ -554,12 +671,11 @@ async def next_round_count(data, epochs, uuid, from_ip):
     global next_round_count_num
     next_round_count_num += 1
     ip_map[uuid] = from_ip
+    lock.release()
     if next_round_count_num == args.num_users:
         # sleep 20 seconds before trigger next round
         print("SLEEP FOR A WHILE...")
-        time.sleep(20)
-        next_round_count_num = 0
-        lock.release()
+        await gen.sleep(20)
         # trigger each node of python to next round
         for user_id in ip_map.keys():
             trigger_data = {
@@ -568,11 +684,8 @@ async def next_round_count(data, epochs, uuid, from_ip):
                 'epochs': epochs - 1,
                 'data': data,
             }
-            json_body = json.dumps(trigger_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
             my_url = "http://" + ip_map[user_id] + ":8888/trigger"
-            asyncio.ensure_future(http_client_post(my_url, json_body, 'next_round_start'))
-    else:
-        lock.release()
+            asyncio.ensure_future(http_client_post(my_url, trigger_data))
 
 
 async def fetch_time(uuid, epochs):
@@ -599,6 +712,8 @@ class TriggerHandler(web.RequestHandler):
         message = data.get("message")
         if message == "train_ready":
             await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
+        if message == "outlier_record_ready":
+            detail = await poll_count(data.get("epochs"), data.get("uuid"))
         elif message == "negotiate_ready":
             await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "next_round_count":

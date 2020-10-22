@@ -35,6 +35,18 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
     logger.info("Received request type: train_ready")
     await invoke(res, channelName, chaincodeName,'TrainReady', JSON.stringify(req.body));
   }
+  else if (body.message === 'outlier_record') {
+    logger.info("Received request type: outlier_record")
+    await invoke(res, channelName, chaincodeName,'OutlierRecord', JSON.stringify(req.body));
+  }
+  else if (body.message === 'check_poll_read') {
+    logger.info("Received request type: check_poll_read")
+    await invoke(res, channelName, chaincodeName,'CheckPollRead', JSON.stringify(req.body));
+  }
+  else if (body.message === 'poll_ready') {
+    logger.info("Received request type: poll_ready")
+    await query(res, channelName, chaincodeName,'PollReady', JSON.stringify(req.body));
+  }
   else if (body.message === 'w_glob') {
     logger.info("Received request type: w_glob")
     await invoke(res, channelName, chaincodeName,'WGlob', JSON.stringify(req.body));
@@ -51,8 +63,9 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
     logger.info("Received request type: negotiate_ready")
     await invoke(res, channelName, chaincodeName, 'NegotiateReady', JSON.stringify(req.body));
   }
-  else
+  else {
     common.responseBadRequestError(res, 'No such request: ' + body.message);
+  }
 });
 
 
@@ -60,12 +73,24 @@ router.get('/test/echo', async function (req, res) {
   common.responseSuccess(res, req.body);
 });
 
+let query = async function(res, channelName, chaincodeName, queryFuncName, args) {
+  let resultBuff = await submitRequest(channelName, chaincodeName, queryFuncName, args, false);
+  let result = resultBuff.toString();
+  logger.debug('Query result: ' + result)
+  if (result) {
+    let detail = JSON.parse(result);
+    common.responseSuccess(res, detail);
+  } else {
+    common.responseSuccess(res, []);
+  }
+}
+
 let invoke = async function(res, channelName, chaincodeName, invokeFuncName, args) {
   let maxTries = 30;
   let errMessage;
   while (maxTries>0) {
     try {
-      await submitRequest(channelName, chaincodeName, invokeFuncName, args);
+      await submitRequest(channelName, chaincodeName, invokeFuncName, args, false);
       common.responseSuccess(res, {});
       return;
     } catch (error) {
@@ -82,7 +107,7 @@ let invoke = async function(res, channelName, chaincodeName, invokeFuncName, arg
   common.responseInternalError(res, errMessage);
 };
 
-let submitRequest = async function (channelName, chaincodeName, invokeFuncName, args) {
+let submitRequest = async function (channelName, chaincodeName, funcName, args, isQuery) {
   // pick an org from ccp first
   let orgName = pickOrgByCCP();
   // load the network configuration
@@ -116,11 +141,17 @@ let submitRequest = async function (channelName, chaincodeName, invokeFuncName, 
   const contract = network.getContract(chaincodeName);
 
   // Submit the specified transaction.
-  await contract.submitTransaction(invokeFuncName, args);
-  logger.info('Transaction has been submitted: ' + invokeFuncName);
+  let result = null;
+  if (isQuery) {
+    result = await contract.evaluateTransaction(funcName, args);
+  } else {
+    result = await contract.submitTransaction(funcName, args);
+  }
+  logger.info('Transaction has been submitted: ' + funcName);
 
   // Disconnect from the gateway.
   await gateway.disconnect();
+  return result;
 }
 
 // pick org from org1 to the last org
