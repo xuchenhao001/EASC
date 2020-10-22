@@ -40,6 +40,10 @@ type AccAlpha struct {
 	Alpha []float64 `json:"alpha"`
 }
 
+type OutliersMap struct {
+	OutlierIds []int `json:"outlier_ids"`
+}
+
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
 	// generate a new uuid for each user
 	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
@@ -177,15 +181,85 @@ func (s *SmartContract) TrainReady(ctx contractapi.TransactionContextInterface, 
 	if err != nil {
 		return fmt.Errorf("failed to read w map from state. %s", err.Error())
 	}
-	// average them, get global_w
 	sendMsg := new(HttpMessage)
-	sendMsg.Message = "average"
+	sendMsg.Message = "security_poll"
 	sendMsg.Data = wMap // send back a w map, the keys are uuids of users
 	sendMsg.Uuid = myuuid
 	sendMsg.Epochs = recMsg.Epochs
 	sendMsgAsBytes, _ := json.Marshal(sendMsg)
-	go sendPostRequest(sendMsgAsBytes, "TRAIN")
+	go sendPostRequest(sendMsgAsBytes, "SECURITY_POLL")
 	return nil
+}
+
+// Security part
+func (s *SmartContract) OutlierRecord(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[OUTLIER RECORD MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// store outlier map into blockchain
+	err := saveAsMap(ctx, "outlierMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to update outlier map into state. %s", err.Error())
+	}
+
+	return nil
+}
+
+func (s *SmartContract) CheckPollRead(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[CHECK POLL READ MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// try to read outlierMap, if all good, then can go on "poll ready".
+	outlierMap, err := readAsMap(ctx, "outlierMap", recMsg.Epochs)
+	if err != nil {
+		return fmt.Errorf("failed to read outlier map from state. %s", err.Error())
+	}
+	if len(outlierMap) == userNum {
+		fmt.Println("gathered enough outlier map [" + strconv.Itoa(len(outlierMap)) +
+			"], can go on to poll ready now.")
+	} else {
+		fmt.Println("not gathered enough outlier map [" + strconv.Itoa(len(outlierMap)) + "], do nothing.")
+	}
+	return nil
+}
+
+func (s *SmartContract) PollReady(ctx contractapi.TransactionContextInterface, receiveMsg string) ([]int, error) {
+	fmt.Println("[POLL READY MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	allOutlierMap, err := readAsMap(ctx, "outlierMap", recMsg.Epochs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read outlier map from state. %s", err.Error())
+	}
+
+	// calculate outlier poll number
+	outlierPollResults := make(map[int]int)
+	for _, value := range allOutlierMap {
+		jsonString, _ := json.Marshal(value)
+		outliers := new(OutliersMap)
+		_ = json.Unmarshal(jsonString, &outliers)
+		for _, outlier := range outliers.OutlierIds {
+			if val, ok := outlierPollResults[outlier]; ok {
+				outlierPollResults[outlier] = val + 1
+			} else {
+				outlierPollResults[outlier] = 0
+			}
+		}
+	}
+	var outlierJudgeResults []int
+	for k, v := range outlierPollResults {
+		if v > userNum / 2 {
+			outlierJudgeResults = append(outlierJudgeResults, k)
+		}
+	}
+
+	return outlierJudgeResults, nil
 }
 
 // STEP #4 part: save w_glob onto distributed ledger
