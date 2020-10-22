@@ -630,18 +630,17 @@ async def negotiate_count(epochs, uuid, test_time):
 
 
 async def next_round_count(data, epochs, uuid, from_ip):
-    lock.acquire()
+    global train_count_num
+    global poll_count_num
+    global negotiate_count_num
     global next_round_count_num
+    lock.acquire()
     next_round_count_num += 1
     ip_map[uuid] = from_ip
     lock.release()
     if next_round_count_num == args.num_users:
         # reset counts
         lock.acquire()
-        global train_count_num
-        global poll_count_num
-        global negotiate_count_num
-        global next_round_count_num
         train_count_num = 0
         poll_count_num = 0
         negotiate_count_num = 0
