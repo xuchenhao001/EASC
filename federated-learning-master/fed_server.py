@@ -258,8 +258,8 @@ async def security_poll(w_compressed_map, uuid, epochs):
     outlier_uuid = []
     for w_uuid in loss_map.keys():
         if loss_map[w_uuid] > outlier_line:
-            print("!!! Found attacker: " + str(w_uuid) + " with loss: " + str(loss_map[w_uuid]))
-            outlier_uuid.append(w_uuid)
+            print("!!! Found attacker: " + w_uuid + " with loss: " + str(loss_map[w_uuid]))
+            outlier_uuid.append(int(w_uuid))
     body_data = {
         'message': 'outlier_record',
         'data': {
