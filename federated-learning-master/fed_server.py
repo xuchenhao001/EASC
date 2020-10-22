@@ -240,14 +240,18 @@ async def security_poll(w_compressed_map, uuid, epochs):
     # test the loss of weight on myself dataset
     idx = int(uuid) - 1
     loss_map = {}
+    cross_test_start_time = time.time()
     for w_uuid in w_map.keys():
         net_glob.load_state_dict(w_map[w_uuid])
         net_glob.eval()
         acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
         loss_map[w_uuid] = loss_test
+        print("Cross test for user " + str(w_uuid) + " result: " + str(loss_test))
+    cross_test_time = time.time() - cross_test_start_time
     loss_mean = statistics.mean(list(loss_map.values()))
     loss_std = statistics.stdev(list(loss_map.values()))
     outlier_line = 2 * loss_std + loss_mean
+    print("Outlier line for epoch [" + str(epochs) + "] is: " + str(outlier_line))
     # just for local test
     # outlier_line = 0.6
     # find out outlier loss value
@@ -300,28 +304,29 @@ async def security_poll(w_compressed_map, uuid, epochs):
     }
     await http_client_post(blockchain_server_url, body_data)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs)
+    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, cross_test_time)
     thread_negotiate.start()
 
 
 # STEP #5
 # Federated Learning: negotiate and test accuracy, upload to blockchain
 class myNegotiateThread(Thread):
-    def __init__(self, my_uuid, w_glob, w_local, epochs):
+    def __init__(self, my_uuid, w_glob, w_local, epochs, cross_test_time):
         Thread.__init__(self)
         self.my_uuid = my_uuid
         self.w_glob = w_glob
         self.w_local = w_local
         self.epochs = epochs
+        self.cross_test_time = cross_test_time
 
     def run(self):
         print("start my negotiate thread: " + self.my_uuid)
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs))
+        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.cross_test_time))
         print("end my negotiate thread: " + self.my_uuid)
 
 
-async def negotiate(my_uuid, w_glob, w_local, epochs):
+async def negotiate(my_uuid, w_glob, w_local, epochs, cross_test_time):
     print("start negotiate for user: " + my_uuid)
 
     negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
@@ -361,7 +366,7 @@ async def negotiate(my_uuid, w_glob, w_local, epochs):
         'message': 'negotiate_ready',
         'epochs': epochs,
         'uuid': my_uuid,
-        'test_time': test_time,
+        'test_time': test_time + cross_test_time,
     }
     await http_client_post(trigger_url, trigger_data)
 
