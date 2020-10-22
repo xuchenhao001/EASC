@@ -259,7 +259,7 @@ func (s *SmartContract) PollReady(ctx contractapi.TransactionContextInterface, r
 		outlierUserNum := userNum / 2
 		if v > outlierUserNum {
 			fmt.Println("[Security] Due to more than " + strconv.Itoa(outlierUserNum) + " vote, user: " +
-				strconv.Itoa(k) + "is treated as malicious user.")
+				strconv.Itoa(k) + " is treated as malicious user.")
 			outlierJudgeResults = append(outlierJudgeResults, k)
 		}
 	}
