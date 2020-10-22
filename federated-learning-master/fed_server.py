@@ -468,15 +468,6 @@ async def round_finish(data, uuid, epochs):
 
 
 async def next_round_start(data, uuid, new_epochs):
-    # reset counts
-    global train_count_num
-    global poll_count_num
-    global negotiate_count_num
-    global next_round_count_num
-    train_count_num = 0
-    poll_count_num = 0
-    negotiate_count_num = 0
-    next_round_count_num = 0
     print("####################\nEpoch #", new_epochs, " start now\n####################")
     # reset a new time for next round
     await train(data, uuid, new_epochs, time.time())
@@ -645,6 +636,17 @@ async def next_round_count(data, epochs, uuid, from_ip):
     ip_map[uuid] = from_ip
     lock.release()
     if next_round_count_num == args.num_users:
+        # reset counts
+        lock.acquire()
+        global train_count_num
+        global poll_count_num
+        global negotiate_count_num
+        global next_round_count_num
+        train_count_num = 0
+        poll_count_num = 0
+        negotiate_count_num = 0
+        next_round_count_num = 0
+        lock.release()
         # sleep 20 seconds before trigger next round
         print("SLEEP FOR A WHILE...")
         await gen.sleep(20)
