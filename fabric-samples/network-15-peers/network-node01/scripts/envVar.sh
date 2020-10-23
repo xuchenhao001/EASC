@@ -29,11 +29,6 @@ export PEER0_ORG12_CA=${PWD}/organizations/peerOrganizations/org12.example.com/p
 export PEER0_ORG13_CA=${PWD}/organizations/peerOrganizations/org13.example.com/peers/peer0.org13.example.com/tls/ca.crt
 export PEER0_ORG14_CA=${PWD}/organizations/peerOrganizations/org14.example.com/peers/peer0.org14.example.com/tls/ca.crt
 export PEER0_ORG15_CA=${PWD}/organizations/peerOrganizations/org15.example.com/peers/peer0.org15.example.com/tls/ca.crt
-export PEER0_ORG16_CA=${PWD}/organizations/peerOrganizations/org16.example.com/peers/peer0.org16.example.com/tls/ca.crt
-export PEER0_ORG17_CA=${PWD}/organizations/peerOrganizations/org17.example.com/peers/peer0.org17.example.com/tls/ca.crt
-export PEER0_ORG18_CA=${PWD}/organizations/peerOrganizations/org18.example.com/peers/peer0.org18.example.com/tls/ca.crt
-export PEER0_ORG19_CA=${PWD}/organizations/peerOrganizations/org19.example.com/peers/peer0.org19.example.com/tls/ca.crt
-export PEER0_ORG20_CA=${PWD}/organizations/peerOrganizations/org20.example.com/peers/peer0.org20.example.com/tls/ca.crt
 
 # Set OrdererOrg.Admin globals
 setOrdererGlobals() {
@@ -110,47 +105,22 @@ setGlobals() {
     export CORE_PEER_LOCALMSPID="Org12MSP"
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG12_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org12.example.com/users/Admin@org12.example.com/msp
-    export CORE_PEER_ADDRESS=${Node06Addr}:9051
+    export CORE_PEER_ADDRESS=${Node07Addr}:9051
   elif [ $USING_ORG -eq 13 ]; then
     export CORE_PEER_LOCALMSPID="Org13MSP"
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG13_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org13.example.com/users/Admin@org13.example.com/msp
-    export CORE_PEER_ADDRESS=${Node07Addr}:10051
+    export CORE_PEER_ADDRESS=${Node08Addr}:10051
   elif [ $USING_ORG -eq 14 ]; then
     export CORE_PEER_LOCALMSPID="Org14MSP"
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG14_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org14.example.com/users/Admin@org14.example.com/msp
-    export CORE_PEER_ADDRESS=${Node07Addr}:11051
+    export CORE_PEER_ADDRESS=${Node09Addr}:11051
   elif [ $USING_ORG -eq 15 ]; then
     export CORE_PEER_LOCALMSPID="Org15MSP"
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG15_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org15.example.com/users/Admin@org15.example.com/msp
-    export CORE_PEER_ADDRESS=${Node08Addr}:12051
-  elif [ $USING_ORG -eq 16 ]; then
-    export CORE_PEER_LOCALMSPID="Org16MSP"
-    export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG16_CA
-    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org16.example.com/users/Admin@org16.example.com/msp
-    export CORE_PEER_ADDRESS=${Node08Addr}:13051
-  elif [ $USING_ORG -eq 17 ]; then
-    export CORE_PEER_LOCALMSPID="Org17MSP"
-    export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG17_CA
-    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org17.example.com/users/Admin@org17.example.com/msp
-    export CORE_PEER_ADDRESS=${Node09Addr}:14051
-  elif [ $USING_ORG -eq 18 ]; then
-    export CORE_PEER_LOCALMSPID="Org18MSP"
-    export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG18_CA
-    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org18.example.com/users/Admin@org18.example.com/msp
-    export CORE_PEER_ADDRESS=${Node09Addr}:15051
-  elif [ $USING_ORG -eq 19 ]; then
-    export CORE_PEER_LOCALMSPID="Org19MSP"
-    export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG19_CA
-    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org19.example.com/users/Admin@org19.example.com/msp
-    export CORE_PEER_ADDRESS=${Node10Addr}:16051
-  elif [ $USING_ORG -eq 20 ]; then
-    export CORE_PEER_LOCALMSPID="Org20MSP"
-    export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG20_CA
-    export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org20.example.com/users/Admin@org20.example.com/msp
-    export CORE_PEER_ADDRESS=${Node10Addr}:17051
+    export CORE_PEER_ADDRESS=${Node10Addr}:12051
   else
     echo "================== ERROR !!! ORG Unknown =================="
   fi
