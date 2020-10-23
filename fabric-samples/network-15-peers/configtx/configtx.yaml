@@ -357,9 +357,9 @@ Orderer: &OrdererDefaults
           ServerTLSCert: ../network-node01/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
     BatchTimeout: 2s
     BatchSize:
-        MaxMessageCount: 10
+        MaxMessageCount: 50
         AbsoluteMaxBytes: 99 MB
-        PreferredMaxBytes: 512 KB
+        PreferredMaxBytes: 50 MB
     Organizations:
     Policies:
         Readers:
