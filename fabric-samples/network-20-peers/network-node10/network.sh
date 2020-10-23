@@ -238,7 +238,7 @@ IMAGETAG="latest"
 # default ca image tag
 CA_IMAGETAG="latest"
 # default database
-DATABASE="couchdb"
+DATABASE="leveldb"
 
 # Parse commandline args
 
