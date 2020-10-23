@@ -147,20 +147,69 @@ function createOrgs() {
       fatalln "Failed to generate certificates..."
     fi
 
-    CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem)
-    CERT=$(echo $CERT | sed 's/\//\\\//g')
-    PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/priv_sk)
-    PRIK=$(echo $PRIK | sed 's/\//\\\//g')
-    sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" ./organizations/wallet-template.json > appUser.id
-    mkdir -p ../../../blockchain-server/routes/rest/wallet/
-    mv appUser.id ../../../blockchain-server/routes/rest/wallet/
-
+    prepare-id org1 Org1MSP
+    prepare-id org2 Org2MSP
+    prepare-id org3 Org3MSP
+    prepare-id org4 Org4MSP
+    prepare-id org5 Org5MSP
+    prepare-id org6 Org6MSP
+    prepare-id org7 Org7MSP
+    prepare-id org8 Org8MSP
+    prepare-id org9 Org9MSP
+    prepare-id org10 Org10MSP
+    prepare-id org11 Org11MSP
+    prepare-id org12 Org12MSP
+    prepare-id org13 Org13MSP
+    prepare-id org14 Org14MSP
+    prepare-id org15 Org15MSP
+    prepare-id org16 Org16MSP
+    prepare-id org17 Org17MSP
+    prepare-id org18 Org18MSP
+    prepare-id org19 Org19MSP
+    prepare-id org20 Org20MSP
   fi
 
   echo
   echo "Generate CCP files for Orgs"
   ./organizations/ccp-generate.sh
-  cp organizations/peerOrganizations/org1.example.com/connection-org1.json ../../../blockchain-server/routes/rest/wallet/connection-org1.json
+  prepare-ccp org1
+  prepare-ccp org2
+  prepare-ccp org3
+  prepare-ccp org4
+  prepare-ccp org5
+  prepare-ccp org6
+  prepare-ccp org7
+  prepare-ccp org8
+  prepare-ccp org9
+  prepare-ccp org10
+  prepare-ccp org11
+  prepare-ccp org12
+  prepare-ccp org13
+  prepare-ccp org14
+  prepare-ccp org15
+  prepare-ccp org16
+  prepare-ccp org17
+  prepare-ccp org18
+  prepare-ccp org19
+  prepare-ccp org20
+}
+
+# USING_ORG=org1
+function prepare-id() {
+  USING_ORG=$1
+  MSPID=$2
+  CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/signcerts/User1@${USING_ORG}.example.com-cert.pem)
+  CERT=$(echo $CERT | sed 's/\//\\\//g')
+  PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/keystore/priv_sk)
+  PRIK=$(echo $PRIK | sed 's/\//\\\//g')
+  sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" -e "s/MSPID/${MSPID}/g" ./organizations/wallet-template.json > ${USING_ORG}.id
+  mkdir -p ../../../blockchain-server/routes/rest/wallet/
+  mv ${USING_ORG}.id ../../../blockchain-server/routes/rest/wallet/
+}
+
+function prepare-ccp() {
+  USING_ORG=$1
+  cp organizations/peerOrganizations/${USING_ORG}.example.com/connection-${USING_ORG}.json ../../../blockchain-server/routes/rest/wallet/connection-${USING_ORG}.json
 }
 
 # Generate orderer system channel genesis block.
@@ -286,6 +335,8 @@ function networkDown() {
     index=$(printf "%02d" $((i+2)))
     ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-20-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
   done
+  # clean wallet
+  rm -f ../../../blockchain-server/routes/rest/wallet/*
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
