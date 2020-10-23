@@ -233,7 +233,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org11MSP.peer')"
         AnchorPeers:
-            - Host: &Node06Addr 10.137.3.6
+            - Host: 10.137.3.6
               Port: 7051
     - &Org12
         Name: Org12MSP
@@ -253,7 +253,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org12MSP.peer')"
         AnchorPeers:
-            - Host: *Node06Addr
+            - Host: 10.137.3.23
               Port: 9051
     - &Org13
         Name: Org13MSP
@@ -273,7 +273,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org13MSP.peer')"
         AnchorPeers:
-            - Host: &Node07Addr 10.137.3.23
+            - Host: 10.137.3.90
               Port: 10051
     - &Org14
         Name: Org14MSP
@@ -293,7 +293,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org14MSP.peer')"
         AnchorPeers:
-            - Host: *Node07Addr
+            - Host: 10.137.3.91
               Port: 11051
     - &Org15
         Name: Org15MSP
@@ -313,108 +313,8 @@ Organizations:
                 Type: Signature
                 Rule: "OR('Org15MSP.peer')"
         AnchorPeers:
-            - Host: &Node08Addr 10.137.3.90
+            - Host: 10.137.3.88
               Port: 12051
-    - &Org16
-        Name: Org16MSP
-        ID: Org16MSP
-        MSPDir: ../network-node01/organizations/peerOrganizations/org16.example.com/msp
-        Policies:
-            Readers:
-                Type: Signature
-                Rule: "OR('Org16MSP.admin', 'Org16MSP.peer', 'Org16MSP.client')"
-            Writers:
-                Type: Signature
-                Rule: "OR('Org16MSP.admin', 'Org16MSP.client')"
-            Admins:
-                Type: Signature
-                Rule: "OR('Org16MSP.admin')"
-            Endorsement:
-                Type: Signature
-                Rule: "OR('Org16MSP.peer')"
-        AnchorPeers:
-            - Host: *Node08Addr
-              Port: 13051
-    - &Org17
-        Name: Org17MSP
-        ID: Org17MSP
-        MSPDir: ../network-node01/organizations/peerOrganizations/org17.example.com/msp
-        Policies:
-            Readers:
-                Type: Signature
-                Rule: "OR('Org17MSP.admin', 'Org17MSP.peer', 'Org17MSP.client')"
-            Writers:
-                Type: Signature
-                Rule: "OR('Org17MSP.admin', 'Org17MSP.client')"
-            Admins:
-                Type: Signature
-                Rule: "OR('Org17MSP.admin')"
-            Endorsement:
-                Type: Signature
-                Rule: "OR('Org17MSP.peer')"
-        AnchorPeers:
-            - Host: &Node09Addr 10.137.3.91
-              Port: 14051
-    - &Org18
-        Name: Org18MSP
-        ID: Org18MSP
-        MSPDir: ../network-node01/organizations/peerOrganizations/org18.example.com/msp
-        Policies:
-            Readers:
-                Type: Signature
-                Rule: "OR('Org18MSP.admin', 'Org18MSP.peer', 'Org18MSP.client')"
-            Writers:
-                Type: Signature
-                Rule: "OR('Org18MSP.admin', 'Org18MSP.client')"
-            Admins:
-                Type: Signature
-                Rule: "OR('Org18MSP.admin')"
-            Endorsement:
-                Type: Signature
-                Rule: "OR('Org18MSP.peer')"
-        AnchorPeers:
-            - Host: *Node09Addr
-              Port: 15051
-    - &Org19
-        Name: Org19MSP
-        ID: Org19MSP
-        MSPDir: ../network-node01/organizations/peerOrganizations/org19.example.com/msp
-        Policies:
-            Readers:
-                Type: Signature
-                Rule: "OR('Org19MSP.admin', 'Org19MSP.peer', 'Org19MSP.client')"
-            Writers:
-                Type: Signature
-                Rule: "OR('Org19MSP.admin', 'Org19MSP.client')"
-            Admins:
-                Type: Signature
-                Rule: "OR('Org19MSP.admin')"
-            Endorsement:
-                Type: Signature
-                Rule: "OR('Org19MSP.peer')"
-        AnchorPeers:
-            - Host: &Node10Addr 10.137.3.88
-              Port: 16051
-    - &Org20
-        Name: Org20MSP
-        ID: Org20MSP
-        MSPDir: ../network-node01/organizations/peerOrganizations/org20.example.com/msp
-        Policies:
-            Readers:
-                Type: Signature
-                Rule: "OR('Org20MSP.admin', 'Org20MSP.peer', 'Org20MSP.client')"
-            Writers:
-                Type: Signature
-                Rule: "OR('Org20MSP.admin', 'Org20MSP.client')"
-            Admins:
-                Type: Signature
-                Rule: "OR('Org20MSP.admin')"
-            Endorsement:
-                Type: Signature
-                Rule: "OR('Org20MSP.peer')"
-        AnchorPeers:
-            - Host: *Node10Addr
-              Port: 17051
 
 Capabilities:
     Channel: &ChannelCapabilities
@@ -517,11 +417,6 @@ Profiles:
                     - *Org13
                     - *Org14
                     - *Org15
-                    - *Org16
-                    - *Org17
-                    - *Org18
-                    - *Org19
-                    - *Org20
     TwoOrgsChannel:
         Consortium: SampleConsortium
         <<: *ChannelDefaults
@@ -543,11 +438,6 @@ Profiles:
                 - *Org13
                 - *Org14
                 - *Org15
-                - *Org16
-                - *Org17
-                - *Org18
-                - *Org19
-                - *Org20
             Capabilities:
                 <<: *ApplicationCapabilities
 
