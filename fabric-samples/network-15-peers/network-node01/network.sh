@@ -162,11 +162,6 @@ function createOrgs() {
     prepare-id org13 Org13MSP
     prepare-id org14 Org14MSP
     prepare-id org15 Org15MSP
-    prepare-id org16 Org16MSP
-    prepare-id org17 Org17MSP
-    prepare-id org18 Org18MSP
-    prepare-id org19 Org19MSP
-    prepare-id org20 Org20MSP
   fi
 
   echo
@@ -187,11 +182,6 @@ function createOrgs() {
   prepare-ccp org13
   prepare-ccp org14
   prepare-ccp org15
-  prepare-ccp org16
-  prepare-ccp org17
-  prepare-ccp org18
-  prepare-ccp org19
-  prepare-ccp org20
 }
 
 # USING_ORG=org1
