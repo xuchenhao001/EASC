@@ -398,7 +398,7 @@ async def round_finish(data, uuid, epochs):
         client = docker.from_env()
         container = client.containers.get('peer0.org' + str(uuid) + '.example.com')
         container.restart()
-        
+
         from_ip = get_ip()
         body_data = {
             'message': 'next_round_count',

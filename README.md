@@ -38,7 +38,7 @@ npm install
 ### Federated Learning
 
 ```bash
-pip3 install matplotlib numpy torch torchvision tornado sklearn
+pip3 install matplotlib numpy torch torchvision tornado sklearn docker
 ```
 
 ### GPU
