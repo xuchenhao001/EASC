@@ -167,7 +167,6 @@ async def prepare():
         'message': 'prepare',
         'data': {
             'w_glob': w_glob_compressed,
-            'user_number': args.num_users,
         },
         'epochs': total_epochs
     }
@@ -195,6 +194,7 @@ async def train(data, uuid, epochs, start_time):
         'message': 'train',
         'data': {
             'w': w_compressed,
+            'user_number': args.num_users,
         },
         'uuid': uuid,
         'epochs': epochs,

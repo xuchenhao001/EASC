@@ -52,19 +52,6 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
-	// unmarshal to read user number
-	dataMap := make(map[string]interface{})
-	dataJson, err := json.Marshal(recMsg.Data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal recMsg.Data interface: %s", err.Error())
-	}
-	err = json.Unmarshal(dataJson, &dataMap)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal dataJson to dataMap: %s", err.Error())
-	}
-	userNum = int(dataMap["user_number"].(float64))
-	fmt.Println("Successfully loaded user number: ", userNum)
-
 	recMsg.Uuid = myuuid
 	sendMsgAsBytes, _ := json.Marshal(recMsg)
 
@@ -132,6 +119,19 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	receiveMsgBytes := []byte(receiveMsg)
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// unmarshal to read user number
+	dataMap := make(map[string]interface{})
+	dataJson, err := json.Marshal(recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recMsg.Data interface: %s", err.Error())
+	}
+	err = json.Unmarshal(dataJson, &dataMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal dataJson to dataMap: %s", err.Error())
+	}
+	userNum = int(dataMap["user_number"].(float64))
+	fmt.Println("Successfully loaded user number: ", userNum)
 
 	// store w map into blockchain
 	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
