@@ -70,13 +70,13 @@ let invoke = async function(res, channelName, chaincodeName, invokeFuncName, arg
       return;
     } catch (error) {
       errMessage = 'Failed to submit transaction: ' + error;
-      // if dirty read happened, retry for 3 times
-      // if (errMessage.indexOf('READ_CONFLICT') !== -1 || errMessage.indexOf('ENDORSEMENT_POLICY_FAILURE') !== -1) {
-      //   maxTries--;
-      // } else {
-      //   maxTries=0;
-      // }
-      maxTries=0; // no retry now
+      // if chaincode not ready, retry for 3 times
+      if (errMessage.indexOf('fabcar error') !== -1) {
+        maxTries--;
+      } else {
+        maxTries=0;
+      }
+      // maxTries=0; // no retry now
     }
   }
   common.responseInternalError(res, errMessage);
