@@ -45,11 +45,6 @@ type OutliersMap struct {
 }
 
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	// generate a new uuid for each user
-	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
-	println("LOCALMSPID: " + localMSPID)
-	myuuid = strings.Trim(localMSPID, "OrgMSP")
-	println("Init finished. My uuid: " + myuuid)
 	return nil
 }
 
@@ -60,20 +55,7 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
-
-	// unmarshal to read user number
-	dataMap := make(map[string]interface{})
-	dataJson, err := json.Marshal(recMsg.Data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal recMsg.Data interface: %s", err.Error())
-	}
-	err = json.Unmarshal(dataJson, &dataMap)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal dataJson to dataMap: %s", err.Error())
-	}
-	userNum = int(dataMap["user_number"].(float64))
-	fmt.Println("Successfully loaded user number: ", userNum)
-
+	
 	recMsg.Uuid = myuuid
 	sendMsgAsBytes, _ := json.Marshal(recMsg)
 
@@ -142,8 +124,21 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
+	// unmarshal to read user number
+	dataMap := make(map[string]interface{})
+	dataJson, err := json.Marshal(recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recMsg.Data interface: %s", err.Error())
+	}
+	err = json.Unmarshal(dataJson, &dataMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal dataJson to dataMap: %s", err.Error())
+	}
+	userNum = int(dataMap["user_number"].(float64))
+	fmt.Println("Successfully loaded user number: ", userNum)
+
 	// store w map into blockchain
-	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	err = saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
 		return fmt.Errorf("failed to update w map into state. %s", err.Error())
 	}
@@ -259,7 +254,7 @@ func (s *SmartContract) PollReady(ctx contractapi.TransactionContextInterface, r
 		outlierUserNum := userNum / 2
 		if v > outlierUserNum {
 			fmt.Println("[Security] Due to more than " + strconv.Itoa(outlierUserNum) + " vote, user: " +
-				strconv.Itoa(k) + "is treated as malicious user.")
+				strconv.Itoa(k) + " is treated as malicious user.")
 			outlierJudgeResults = append(outlierJudgeResults, k)
 		}
 	}
@@ -462,12 +457,20 @@ func sendPostRequest(buf []byte, requestType string) {
 	} else {
 		fmt.Println("SEND REQUEST [" + requestType + "]: No reply")
 	}
+}
 
+func myInit() {
+	// generate a new uuid for each user
+	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
+	println("LOCALMSPID: " + localMSPID)
+	myuuid = strings.Trim(localMSPID, "OrgMSP")
+	println("Init finished. My uuid: " + myuuid)
 }
 
 func main() {
 
 	chaincode, err := contractapi.NewChaincode(new(SmartContract))
+	myInit()
 
 	if err != nil {
 		fmt.Printf("Error create chaincode: %s", err.Error())
