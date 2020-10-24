@@ -41,11 +41,6 @@ type AccAlpha struct {
 }
 
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	// generate a new uuid for each user
-	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
-	println("LOCALMSPID: " + localMSPID)
-	myuuid = strings.Trim(localMSPID, "OrgMSP")
-	println("Init finished. My uuid: " + myuuid)
 	return nil
 }
 
@@ -386,9 +381,18 @@ func sendPostRequest(buf []byte, requestType string) {
 
 }
 
+func myInit() {
+	// generate a new uuid for each user
+	var localMSPID string = os.Getenv("CORE_PEER_LOCALMSPID")
+	println("LOCALMSPID: " + localMSPID)
+	myuuid = strings.Trim(localMSPID, "OrgMSP")
+	println("Init finished. My uuid: " + myuuid)
+}
+
 func main() {
 
 	chaincode, err := contractapi.NewChaincode(new(SmartContract))
+	myInit()
 
 	if err != nil {
 		fmt.Printf("Error create chaincode: %s", err.Error())
