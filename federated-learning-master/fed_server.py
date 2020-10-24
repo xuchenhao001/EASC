@@ -3,6 +3,7 @@
 # Python version: 3.6
 import asyncio
 import base64
+import docker
 import gzip
 import json
 import matplotlib
@@ -480,6 +481,11 @@ async def round_finish(data, uuid, epochs):
                                + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
+        # restart peer docker container due to memory leakage
+        client = docker.from_env()
+        container = client.containers.get('peer0.org' + str(uuid) + '.example.com')
+        container.restart()
+        
         from_ip = get_ip()
         body_data = {
             'message': 'next_round_count',
