@@ -134,7 +134,7 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	fmt.Println("Successfully loaded user number: ", userNum)
 
 	// store w map into blockchain
-	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	err = saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
 		return fmt.Errorf("failed to update w map into state. %s", err.Error())
 	}
