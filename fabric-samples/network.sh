@@ -6,8 +6,7 @@ export PATH=${PWD}/../../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/../configtx
 export VERBOSE=false
 
-AllNodesAddrs=(10.137.3.71 10.137.3.68 10.137.3.20 10.137.3.69)
-
+source ./network.config
 source scriptUtils.sh
 
 # Print the usage message
@@ -122,89 +121,6 @@ function checkPrereqs() {
 
 }
 
-# Create Organziation crypto material using cryptogen or CAs
-function createOrgs() {
-
-  if [ -d "organizations/peerOrganizations" ]; then
-    rm -Rf organizations/peerOrganizations && rm -Rf organizations/ordererOrganizations
-  fi
-
-  # Create crypto material using cryptogen
-  if [ "$CRYPTO" == "cryptogen" ]; then
-    which cryptogen
-    if [ "$?" -ne 0 ]; then
-      fatalln "cryptogen tool not found. exiting"
-    fi
-    infoln "Generate certificates using cryptogen tool"
-
-    infoln "Create Orgs Identities"
-
-    set -x
-    cryptogen generate --config=./organizations/crypto-config.yaml --output="organizations"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
-    fi
-
-    prepare-id org1 Org1MSP
-    prepare-id org2 Org2MSP
-    prepare-id org3 Org3MSP
-    prepare-id org4 Org4MSP
-    prepare-id org5 Org5MSP
-  fi
-
-  echo
-  echo "Generate CCP files for Orgs"
-  ./organizations/ccp-generate.sh
-  prepare-ccp org1
-  prepare-ccp org2
-  prepare-ccp org3
-  prepare-ccp org4
-  prepare-ccp org5
-}
-
-# USING_ORG=org1
-function prepare-id() {
-  USING_ORG=$1
-  MSPID=$2
-  CERT=$(sed ':a;N;$!ba;s/\n/\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/signcerts/User1@${USING_ORG}.example.com-cert.pem)
-  CERT=$(echo $CERT | sed 's/\//\\\//g')
-  PRIK=$(sed ':a;N;$!ba;s/\n/\\\\r\\\\n/g' ./organizations/peerOrganizations/${USING_ORG}.example.com/users/User1@${USING_ORG}.example.com/msp/keystore/priv_sk)
-  PRIK=$(echo $PRIK | sed 's/\//\\\//g')
-  sed -e "s/CERT/${CERT}/g" -e "s/PRIK/${PRIK}/g" -e "s/MSPID/${MSPID}/g" ./organizations/wallet-template.json > ${USING_ORG}.id
-  mkdir -p ../../../blockchain-server/routes/rest/wallet/
-  mv ${USING_ORG}.id ../../../blockchain-server/routes/rest/wallet/
-}
-
-function prepare-ccp() {
-  USING_ORG=$1
-  cp organizations/peerOrganizations/${USING_ORG}.example.com/connection-${USING_ORG}.json ../../../blockchain-server/routes/rest/wallet/connection-${USING_ORG}.json
-}
-
-# Generate orderer system channel genesis block.
-function createConsortium() {
-
-  which configtxgen
-  if [ "$?" -ne 0 ]; then
-    echo "configtxgen tool not found. exiting"
-    exit 1
-  fi
-
-  echo "#########  Generating Orderer Genesis block ##############"
-
-  # Note: For some unknown reason (at least for now) the block file can't be
-  # named orderer.genesis.block or the orderer will fail to launch!
-  set -x
-  configtxgen -profile TwoOrgsOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
-  res=$?
-  set +x
-  if [ $res -ne 0 ]; then
-    echo "Failed to generate orderer genesis block..."
-    exit 1
-  fi
-}
-
 # After we create the org crypto material and the system channel genesis block,
 # we can now bring up the peers and orderering service. By default, the base
 # file for creating the network is "docker-compose-test-net.yaml" in the ``docker``
@@ -216,45 +132,57 @@ function networkUp() {
 
   checkPrereqs
   # generate artifacts if they don't exist
-  if [ ! -d "organizations/peerOrganizations" ]; then
-    createOrgs
-    createConsortium
-  fi
-
-  COMPOSE_FILES="-f ${COMPOSE_FILE_BASE}"
-
-  if [ "${DATABASE}" == "couchdb" ]; then
-    COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILE_COUCH}"
-  fi
-
-  IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1
-
-  docker ps -a
-  if [ $? -ne 0 ]; then
-    echo "ERROR !!!! Unable to start network"
+  if [ ! -d "network-cache/peerOrganizations" ]; then
+    echo "Please run \"prepare-certs.sh\" first!"
     exit 1
   fi
 
-  releaseCerts
-  cleanResults
-}
+  for i in "${!PeerAddress[@]}"; do
+    addrIN=(${PeerAddress[i]//:/ })
+    # check ssh connection first
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    if [[ $status != "ok" ]]; then
+        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+        exit 1
+    fi
 
-function releaseCerts() {
-  tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-10-peers/network-node${index}/peerOrganizations.tar.gz
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+    # start remote peer with docker-compose
+    COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
+
+    # if [ "${DATABASE}" == "couchdb" ]; then
+    #   COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILE_COUCH}"
+    # fi
+
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1"
   done
-  rm -f peerOrganizations.tar.gz
+
 }
 
-function cleanResults() {
+function cleanLogs() {
   rm -f ~/EASC/federated-learning-master/result-record_*.txt
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+  for i in "${!PeerAddress[@]}"; do
+    addrIN=(${PeerAddress[i]//:/ })
+    ssh ubuntu@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
   done
+}
+
+function cleanCerts() {
+  for i in "${!PeerAddress[@]}"; do
+    addrIN=(${PeerAddress[i]//:/ })
+    # check ssh connection first
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    if [[ $status != "ok" ]]; then
+        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+        exit 1
+    fi
+
+    COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
+
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans && ./clear.sh"
+  done
+
+  # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
+  
 }
 
 ## call the script to join create the channel and join the peers of org1 and org2
@@ -301,12 +229,12 @@ function networkDown() {
   rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
   rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
+  for i in "${!PeerAddress[@]}"; do
+    addrIN=(${PeerAddress[i]//:/ })
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && ./network.sh down && rm -rf network-cache/*"
   done
   # clean wallet
-  rm -f ../../../blockchain-server/routes/rest/wallet/*
+  rm -f ../blockchain-server/routes/rest/wallet/*
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
@@ -321,10 +249,8 @@ MAX_RETRY=5
 CLI_DELAY=3
 # channel name defaults to "mychannel"
 CHANNEL_NAME="mychannel"
-# use this as the default docker-compose yaml definition
-COMPOSE_FILE_BASE=docker/docker-compose-test-net.yaml
 # docker-compose.yaml file if you are using couchdb
-COMPOSE_FILE_COUCH=docker/docker-compose-couch.yaml
+# COMPOSE_FILE_COUCH=docker/docker-compose-couch.yaml
 # certificate authorities compose file
 COMPOSE_FILE_CA=docker/docker-compose-ca.yaml
 #
@@ -463,4 +389,5 @@ else
   printHelp
   exit 1
 fi
+
 

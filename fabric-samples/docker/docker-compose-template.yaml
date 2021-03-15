@@ -10,7 +10,7 @@ services:
   peer0.org${ORGNUM}.example.com:
     container_name: peer0.org${ORGNUM}.example.com
     extends:
-      file: peer-base.yaml
+      file: ../peer-base.yaml
       service: peer-base
     environment:
       - CORE_PEER_ID=peer0.org${ORGNUM}.example.com
