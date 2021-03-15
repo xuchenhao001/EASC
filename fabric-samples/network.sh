@@ -166,25 +166,6 @@ function cleanLogs() {
   done
 }
 
-function cleanCerts() {
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
-    # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
-    if [[ $status != "ok" ]]; then
-        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
-        exit 1
-    fi
-
-    COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
-
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans && ./clear.sh"
-  done
-
-  # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
-  
-}
-
 ## call the script to join create the channel and join the peers of org1 and org2
 function createChannel() {
 
@@ -220,21 +201,23 @@ function deployCC() {
   exit 0
 }
 
-
 # Tear down running network
 function networkDown() {
-  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
-  clearContainers
-  removeUnwantedImages
-  rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
-  rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
-
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && ./network.sh down && rm -rf network-cache/*"
+    # check ssh connection first
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    if [[ $status != "ok" ]]; then
+        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+        exit 1
+    fi
+
+    COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
+
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
   done
-  # clean wallet
-  rm -f ../blockchain-server/routes/rest/wallet/*
+
+  # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct

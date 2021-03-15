@@ -10,7 +10,7 @@ services:
   peer0.org${ORGNUM}.example.com:
     container_name: peer0.org${ORGNUM}.example.com
     extends:
-      file: ../peer-base.yaml
+      file: ../docker/peer-base.yaml
       service: peer-base
     environment:
       - CORE_PEER_ID=peer0.org${ORGNUM}.example.com
@@ -23,8 +23,8 @@ services:
       - CORE_PEER_LOCALMSPID=Org${ORGNUM}MSP
     volumes:
         - /var/run/:/host/var/run/
-        - ../organizations/peerOrganizations/org${ORGNUM}.example.com/peers/peer0.org${ORGNUM}.example.com/msp:/etc/hyperledger/fabric/msp
-        - ../organizations/peerOrganizations/org${ORGNUM}.example.com/peers/peer0.org${ORGNUM}.example.com/tls:/etc/hyperledger/fabric/tls
+        - ./peerOrganizations/org${ORGNUM}.example.com/peers/peer0.org${ORGNUM}.example.com/msp:/etc/hyperledger/fabric/msp
+        - ./peerOrganizations/org${ORGNUM}.example.com/peers/peer0.org${ORGNUM}.example.com/tls:/etc/hyperledger/fabric/tls
         - peer0.org${ORGNUM}.example.com:/var/hyperledger/production
     ports:
       - ${PORT}:${PORT}

@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# Obtain CONTAINER_IDS and remove them
-# TODO Might want to make this optional - could clear other containers
-# This function is called when you bring a network down
+# NEED TO RUN WITH ROOT
 function clearContainers() {
   CONTAINER_IDS=$(docker ps -a | awk '($2 ~ /dev-peer.*/) {print $1}')
   if [ -z "$CONTAINER_IDS" -o "$CONTAINER_IDS" == " " ]; then
@@ -12,9 +10,6 @@ function clearContainers() {
   fi
 }
 
-# Delete any images that were generated as a part of this setup
-# specifically the following images are often left behind:
-# This function is called when you bring the network down
 function removeUnwantedImages() {
   DOCKER_IMAGE_IDS=$(docker images | awk '($1 ~ /dev-peer.*/) {print $3}')
   if [ -z "$DOCKER_IMAGE_IDS" -o "$DOCKER_IMAGE_IDS" == " " ]; then
@@ -24,10 +19,10 @@ function removeUnwantedImages() {
   fi
 }
 
-
 function clear() {
 	clearContainers
 	removeUnwantedImages
+	set -x
 	rm -rf system-genesis-block/*.block networkCache.tar.gz network-cache/* 
 	rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
@@ -35,4 +30,4 @@ function clear() {
 	rm -f ../blockchain-server/routes/rest/wallet/*
 }
 
-
+clear
