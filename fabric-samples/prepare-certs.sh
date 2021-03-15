@@ -11,20 +11,27 @@ source ./network.config
 source scriptUtils.sh
 
 function releaseCerts() {
-  tar -zcf peerOrganizations.tar.gz organizations/peerOrganizations/
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    scp peerOrganizations.tar.gz ubuntu@${AllNodesAddrs[$i]}:~/EASC/fabric-samples/network-10-peers/network-node${index}/peerOrganizations.tar.gz
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && tar -zxf peerOrganizations.tar.gz && rm -f peerOrganizations.tar.gz && ./network.sh up"
+  tar -zcf networkCache.tar.gz network-cache/
+  for i in "${!PeerAddress[@]}"; do
+  	addrIN=(${PeerAddress[i]//:/ })
+  	# check ssh connection first
+  	status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+  	if [[ $status != "ok" ]]; then
+  		echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+  		exit 1
+  	fi
+    scp networkCache.tar.gz ubuntu@${addrIN[0]}:~/EASC/fabric-samples/networkCache.tar.gz
+    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz && rm -f networkCache.tar.gz && ./network.sh up"
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz && rm -f networkCache.tar.gz"
   done
-  rm -f peerOrganizations.tar.gz
+  rm -f networkCache.tar.gz
 }
 
 function cleanLogs() {
   rm -f ~/EASC/federated-learning-master/result-record_*.txt
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+  for i in "${!PeerAddress[@]}"; do
+  	addrIN=(${PeerAddress[i]//:/ })
+    ssh ubuntu@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
   done
 }
 
@@ -32,15 +39,16 @@ function cleanCerts() {
   docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
   clearContainers
   removeUnwantedImages
-  rm -rf system-genesis-block/*.block peerOrganizations.tar.gz organizations/peerOrganizations organizations/ordererOrganizations
+  rm -rf system-genesis-block/*.block networkCache.tar.gz network-cache/* 
   rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
 
-  for i in ${!AllNodesAddrs[@]}; do
-    index=$(printf "%02d" $((i+2)))
-    ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/network-10-peers/network-node${index} && ./network.sh down && rm -rf organizations/"
+  for i in "${!PeerAddress[@]}"; do
+  	addrIN=(${PeerAddress[i]//:/ })
+    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/ && ./network.sh down && rm -rf network-cache/*"
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && rm -rf network-cache/*"
   done
   # clean wallet
-  rm -f ../../../blockchain-server/routes/rest/wallet/*
+  rm -f ../blockchain-server/routes/rest/wallet/*
 }
 
 function createOrgs() {
@@ -336,7 +344,7 @@ function main() {
   generateConfigTX
   generateCerts
   generateDockerCompose
-  # releaseCerts
+  releaseCerts
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
@@ -370,4 +378,4 @@ CA_IMAGETAG="latest"
 DATABASE="goleveldb"
 
 main
-# test
+
