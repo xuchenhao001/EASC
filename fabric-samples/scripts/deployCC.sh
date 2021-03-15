@@ -1,3 +1,6 @@
+#!/bin/bash
+
+source ./network.config
 
 CHANNEL_NAME="$1"
 CC_SRC_LANGUAGE="$2"
@@ -13,14 +16,12 @@ VERBOSE="$6"
 : ${VERBOSE:="false"}
 CC_SRC_LANGUAGE=`echo "$CC_SRC_LANGUAGE" | tr [:upper:] [:lower:]`
 
-FABRIC_CFG_PATH=$PWD/../configtx/
-
 if [ "$CC_SRC_LANGUAGE" = "go" -o "$CC_SRC_LANGUAGE" = "golang" ] ; then
   CC_RUNTIME_LANGUAGE=golang
-  CC_SRC_PATH="../../chaincode/fabcar/go/"
+  CC_SRC_PATH="./chaincode/fabcar/go/"
 
   echo Vendoring Go dependencies ...
-  pushd ../../chaincode/fabcar/go
+  pushd ./chaincode/fabcar/go
   GO111MODULE=on go mod vendor
   popd
   echo Finished vendoring Go dependencies
@@ -59,8 +60,7 @@ fi
 # import utils
 . scripts/envVar.sh
 
-
-packageChaincode() {
+function packageChaincode() {
   ORG=$1
   setGlobals $ORG
   set -x
@@ -74,7 +74,7 @@ packageChaincode() {
 }
 
 # installChaincode PEER ORG
-installChaincode() {
+function installChaincode() {
   ORG=$1
   setGlobals $ORG
   set -x
@@ -88,7 +88,7 @@ installChaincode() {
 }
 
 # queryInstalled PEER ORG
-queryInstalled() {
+function queryInstalled() {
   ORG=$1
   setGlobals $ORG
   set -x
@@ -103,7 +103,7 @@ queryInstalled() {
 }
 
 # approveForMyOrg VERSION PEER ORG
-approveForMyOrg() {
+function approveForMyOrg() {
   ORG=$1
   setGlobals $ORG
   set -x
@@ -116,7 +116,7 @@ approveForMyOrg() {
 }
 
 # checkCommitReadiness VERSION PEER ORG
-checkCommitReadiness() {
+function checkCommitReadiness() {
   ORG=$1
   shift 1
   setGlobals $ORG
@@ -150,7 +150,7 @@ checkCommitReadiness() {
 }
 
 # commitChaincodeDefinition VERSION PEER ORG (PEER ORG)...
-commitChaincodeDefinition() {
+function commitChaincodeDefinition() {
   parsePeerConnectionParameters $@
   res=$?
   verifyResult $res "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters "
@@ -169,7 +169,7 @@ commitChaincodeDefinition() {
 }
 
 # queryCommitted ORG
-queryCommitted() {
+function queryCommitted() {
   ORG=$1
   setGlobals $ORG
   EXPECTED_RESULT="Version: ${VERSION}, Sequence: ${VERSION}, Endorsement Plugin: escc, Validation Plugin: vscc"
@@ -201,7 +201,7 @@ queryCommitted() {
   fi
 }
 
-chaincodeInvokeInit() {
+function chaincodeInvokeInit() {
   parsePeerConnectionParameters $@
   res=$?
   verifyResult $res "Invoke transaction failed on channel '$CHANNEL_NAME' due to uneven number of peer and org parameters "
@@ -219,7 +219,7 @@ chaincodeInvokeInit() {
   echo
 }
 
-chaincodeQuery() {
+function chaincodeQuery() {
   ORG=$1
   setGlobals $ORG
   echo "===================== Querying on peer0.org${ORG} on channel '$CHANNEL_NAME'... ===================== "
@@ -249,52 +249,58 @@ chaincodeQuery() {
   fi
 }
 
-SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member')"
+function join_by { local d=$1; shift; local f=$1; shift; printf %s "$f" "${@/#/$d}"; }
 
-## at first we package the chaincode
-packageChaincode 1
+function main() {
+  ORGMEMBERARR=""
+  for i in "${!PeerAddress[@]}"; do
+    ORGMEMBERARR="${ORGMEMBERARR} Org$((i+1))MSP.member"
+  done
+  SIGNATURE_POLICY=$(join_by "','" ${ORGMEMBERARR})
+  SIGNATURE_POLICY="AND('${SIGNATURE_POLICY}')"
+  # SIGNATURE_POLICY="AND('Org1MSP.member','Org2MSP.member','Org3MSP.member','Org4MSP.member','Org5MSP.member')"
 
-## Install chaincode on peer0.org1 and peer0.org2
-echo "Installing chaincode on peers..."
-installChaincode 1
-installChaincode 2
-installChaincode 3
-installChaincode 4
-installChaincode 5
+  ## at first we package the chaincode
+  packageChaincode 1
 
-## query whether the chaincode is installed
-queryInstalled 1
+  ## Install chaincode on peer0.org1 and peer0.org2
+  echo "Installing chaincode on peers..."
+  for i in "${!PeerAddress[@]}"; do
+    installChaincode $((i+1))
+  done
 
-## approve the definition for org
-approveForMyOrg 1
-checkCommitReadiness 1 "\"Org1MSP\": true"
-approveForMyOrg 2
-checkCommitReadiness 2 "\"Org2MSP\": true"
-approveForMyOrg 3
-checkCommitReadiness 3 "\"Org3MSP\": true"
-approveForMyOrg 4
-checkCommitReadiness 4 "\"Org4MSP\": true"
-approveForMyOrg 5
-checkCommitReadiness 5 "\"Org5MSP\": true"
+  ## query whether the chaincode is installed
+  queryInstalled 1
 
-## now that we know for sure both orgs have approved, commit the definition
-commitChaincodeDefinition 1 2 3 4 5
+  ## approve the definition for org
+  for i in "${!PeerAddress[@]}"; do
+    approveForMyOrg $((i+1))
+    checkCommitReadiness $((i+1)) "\"Org$((i+1))MSP\": true"
+  done
 
-## query on both orgs to see that the definition committed successfully
-queryCommitted 1
-queryCommitted 2
-queryCommitted 3
-queryCommitted 4
-queryCommitted 5
+  ## now that we know for sure both orgs have approved, commit the definition
+  COMMIT_IDS=""
+  for i in "${!PeerAddress[@]}"; do
+    COMMIT_IDS="${COMMIT_IDS} $((i+1))"
+  done
+  commitChaincodeDefinition ${COMMIT_IDS}
 
-## Invoke the chaincode
-chaincodeInvokeInit 1 2 3 4 5
+  ## query on both orgs to see that the definition committed successfully
+  for i in "${!PeerAddress[@]}"; do
+    queryCommitted $((i+1))
+  done
 
-sleep 10
+  ## Invoke the chaincode
+  chaincodeInvokeInit ${COMMIT_IDS}
 
-# Query chaincode on peer0.org1
-# echo "Querying chaincode on peer0.org1..."
-# chaincodeQuery 1
+  sleep 10
 
-exit 0
+  # Query chaincode on peer0.org1
+  # echo "Querying chaincode on peer0.org1..."
+  # chaincodeQuery 1
+
+  exit 0
+}
+
+main
 

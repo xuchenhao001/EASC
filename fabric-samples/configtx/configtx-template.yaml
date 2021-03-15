@@ -14,7 +14,7 @@ Organizations:
                 Type: Signature
                 Rule: "OR('OrdererMSP.admin')"
         OrdererEndpoints:
-            - ORG1ADDR
+            - ORDERERADDR
 ORGSDETAIL
 
 Capabilities:

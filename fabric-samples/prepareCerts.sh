@@ -199,37 +199,48 @@ function generateOrdererDockerCompose() {
   cp docker/orderer-template.yaml network-cache/orderer.yaml
 }
 
+#################################
+# prepare core.yaml
+#################################
+
+function prepareCoreConfig() {
+  cp configtx/core.yaml network-cache/core.yaml
+}
+
 ##########################
 # prepare configtx.yaml
 ##########################
 function generateConfigTX() {
 	ORGS_DETAIL=""
-    for i in "${!PeerAddress[@]}"; do
-        addrIN=(${PeerAddress[i]//:/ })
-        ORGS_DETAIL=$(echo -e "$ORGS_DETAIL\n$(parseOrgDetail $((i+1)) ${addrIN[0]} ${addrIN[1]})")
-    done
-    ORGS_DETAIL=$(echo "$ORGS_DETAIL" | awk '{printf "%s\\n", $0}' | sed 's/\\n//')
-    ORGS_DETAIL=$(echo "${ORGS_DETAIL//\"/\\\"}")
-    ORGS_DETAIL=$(echo "${ORGS_DETAIL//\&/\\\&}")
-    ORGS_DETAIL=$(echo "$ORGS_DETAIL" | sed 's/\//\\\//g')
+  for i in "${!PeerAddress[@]}"; do
+      addrIN=(${PeerAddress[i]//:/ })
+      ORGS_DETAIL=$(echo -e "$ORGS_DETAIL\n$(parseOrgDetail $((i+1)) ${addrIN[0]} ${addrIN[1]})")
+  done
+  ORGS_DETAIL=$(echo "$ORGS_DETAIL" | awk '{printf "%s\\n", $0}' | sed 's/\\n//')
+  ORGS_DETAIL=$(echo "${ORGS_DETAIL//\"/\\\"}")
+  ORGS_DETAIL=$(echo "${ORGS_DETAIL//\&/\\\&}")
+  ORGS_DETAIL=$(echo "$ORGS_DETAIL" | sed 's/\//\\\//g')
 
-    ORGSLIST1=""
-    for i in "${!PeerAddress[@]}"; do
-      ORGSLIST1=$(echo "$ORGSLIST1 \n                    - *Org$((i+1))")
-    done
-    ORGSLIST1=$(echo "$ORGSLIST1" | sed 's/\\n //')
+  ORGSLIST1=""
+  for i in "${!PeerAddress[@]}"; do
+    ORGSLIST1=$(echo "$ORGSLIST1 \n                    - *Org$((i+1))")
+  done
+  ORGSLIST1=$(echo "$ORGSLIST1" | sed 's/\\n //')
 
-    ORGSLIST2=""
-    for i in "${!PeerAddress[@]}"; do
-      ORGSLIST2=$(echo "$ORGSLIST2 \n                - *Org$((i+1))")
-    done
-    ORGSLIST2=$(echo "$ORGSLIST2" | sed 's/\\n //')
+  ORGSLIST2=""
+  for i in "${!PeerAddress[@]}"; do
+    ORGSLIST2=$(echo "$ORGSLIST2 \n                - *Org$((i+1))")
+  done
+  ORGSLIST2=$(echo "$ORGSLIST2" | sed 's/\\n //')
 
-    sed -e "s/ORG1ADDR/${PeerAddress[0]}/g" \
-        -e "s/ORGSDETAIL/$ORGS_DETAIL/g" \
-        -e "s/ORGSLIST1/$ORGSLIST1/g" \
-        -e "s/ORGSLIST2/$ORGSLIST2/g" \
-        ./configtx/configtx-template.yaml > network-cache/configtx.yaml
+  ORG1AddrPort=(${PeerAddress[0]//:/ })
+  ORDERERADDR="${ORG1AddrPort[0]}:$((${ORG1AddrPort[1]}-1))"
+  
+  sed -e "s/ORDERERADDR/${ORDERERADDR}/g" \
+      -e "s/ORGSDETAIL/$ORGS_DETAIL/g" \
+      -e "s/ORGSLIST1/$ORGSLIST1/g" \
+      -e "s/ORGSLIST2/$ORGSLIST2/g" \
+      ./configtx/configtx-template.yaml > network-cache/configtx.yaml
 }
 
 function parseOrgDetail() {
@@ -329,8 +340,10 @@ function main() {
   generateCerts
   generatePeerDockerCompose
   generateOrdererDockerCompose
+  prepareCoreConfig
   releaseCerts
 }
 
 main
+
 

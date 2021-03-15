@@ -16,8 +16,7 @@ if [ ! -d "channel-artifacts" ]; then
   mkdir channel-artifacts
 fi
 
-createChannelTx() {
-
+function createChannelTx() {
   set -x
   echo $FABRIC_CFG_PATH
   configtxgen -profile TwoOrgsChannel -outputCreateChannelTx ./channel-artifacts/${CHANNEL_NAME}.tx -channelID $CHANNEL_NAME
@@ -31,7 +30,7 @@ createChannelTx() {
 
 }
 
-createAncorPeerTx() {
+function createAncorPeerTx() {
   ORGMSP=$1
 
   echo "#######    Generating anchor peer update transaction for ${ORGMSP}  ##########"
@@ -46,7 +45,7 @@ createAncorPeerTx() {
   echo
 }
 
-createChannel() {
+function createChannel() {
   setGlobals 1
   # Poll in case the raft leader is not set yet
   local rc=1
@@ -68,7 +67,7 @@ createChannel() {
 }
 
 # queryCommitted ORG
-joinChannel() {
+function joinChannel() {
   ORG=$1
   setGlobals $ORG
   local rc=1
@@ -88,7 +87,7 @@ joinChannel() {
   verifyResult $res "After $MAX_RETRY attempts, peer0.org${ORG} has failed to join channel '$CHANNEL_NAME' "
 }
 
-updateAnchorPeers() {
+function updateAnchorPeers() {
   ORG=$1
   setGlobals $ORG
   local rc=1
@@ -110,7 +109,7 @@ updateAnchorPeers() {
   echo
 }
 
-verifyResult() {
+function verifyResult() {
   if [ $1 -ne 0 ]; then
     echo "!!!!!!!!!!!!!!! "$2" !!!!!!!!!!!!!!!!"
     echo
@@ -118,45 +117,40 @@ verifyResult() {
   fi
 }
 
-FABRIC_CFG_PATH=${PWD}/../configtx
 
-## Create channeltx
-echo "### Generating channel create transaction '${CHANNEL_NAME}.tx' ###"
-createChannelTx
+function main() {
+  ## Create channeltx
+  echo "### Generating channel create transaction '${CHANNEL_NAME}.tx' ###"
+  createChannelTx
 
-## Create anchorpeertx
-echo "### Generating anchor peer update transactions ###"
-createAncorPeerTx Org1MSP
-createAncorPeerTx Org2MSP
-createAncorPeerTx Org3MSP
-createAncorPeerTx Org4MSP
-createAncorPeerTx Org5MSP
+  ## Create anchorpeertx
+  echo "### Generating anchor peer update transactions ###"
+  for i in "${!PeerAddress[@]}"; do
+    createAncorPeerTx Org$((i+1))MSP
+  done
 
-# FABRIC_CFG_PATH=$PWD/../config/
+  ## Create channel
+  echo "Creating channel "$CHANNEL_NAME
+  createChannel
 
-## Create channel
-echo "Creating channel "$CHANNEL_NAME
-createChannel
+  ## Join all the peers to the channel
+  echo "Join Org peers to the channel..."
+  for i in "${!PeerAddress[@]}"; do
+    joinChannel $((i+1))
+  done
 
-## Join all the peers to the channel
-echo "Join Org peers to the channel..."
-joinChannel 1
-joinChannel 2
-joinChannel 3
-joinChannel 4
-joinChannel 5
+  ## Set the anchor peers for each org in the channel
+  echo "Updating anchor peers for orgs..."
+  for i in "${!PeerAddress[@]}"; do
+    updateAnchorPeers $((i+1))
+  done
 
-## Set the anchor peers for each org in the channel
-echo "Updating anchor peers for orgs..."
-updateAnchorPeers 1
-updateAnchorPeers 2
-updateAnchorPeers 3
-updateAnchorPeers 4
-updateAnchorPeers 5
+  echo
+  echo "========= Channel successfully joined =========== "
+  echo
 
-echo
-echo "========= Channel successfully joined =========== "
-echo
+  exit 0
+}
 
-exit 0
+main
 

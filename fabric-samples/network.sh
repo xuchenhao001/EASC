@@ -3,7 +3,7 @@
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
 export PATH=${PWD}/../../bin:$PATH
-export FABRIC_CFG_PATH=${PWD}/../configtx
+export FABRIC_CFG_PATH=${PWD}/network-cache/
 export VERBOSE=false
 
 source ./network.config
@@ -185,7 +185,7 @@ function createChannel() {
   # more to create the channel creation transaction and the anchor peer updates.
   # configtx.yaml is mounted in the cli container, which allows us to use it to
   # create the channel artifacts
- scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE
+  scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE
   if [ $? -ne 0 ]; then
     echo "Error !!! Create channel failed"
     exit 1
@@ -218,6 +218,10 @@ function networkDown() {
     fi
 
     COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
+
+    if [[ $i -eq 0 ]]; then
+      COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
+    fi
 
     ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
   done
