@@ -172,10 +172,10 @@ function checkPrereqs() {
 }
 
 #################################
-# prepare docker-compose.yaml
+# prepare docker-compose-org*.yaml
 #################################
 
-function generateDockerCompose() {
+function generatePeerDockerCompose() {
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
     echo "$(prepareDockerCompose $((i+1)) ${addrIN[0]} ${addrIN[1]} $((addrIN[1]+1)))" > network-cache/docker-compose-org$((i+1)).yaml
@@ -187,7 +187,16 @@ function prepareDockerCompose() {
       -e "s/\${ADDR}/$2/g" \
       -e "s/\${PORT}/$3/g" \
       -e "s/\${CCPORT}/$4/g" \
-      docker/docker-compose-template.yaml
+      docker/peer-template.yaml
+}
+
+
+#################################
+# prepare orderer.yaml
+#################################
+
+function generateOrdererDockerCompose() {
+  cp docker/orderer-template.yaml network-cache/orderer.yaml
 }
 
 ##########################
@@ -318,7 +327,8 @@ function main() {
   generateCryptoConfig
   generateConfigTX
   generateCerts
-  generateDockerCompose
+  generatePeerDockerCompose
+  generateOrdererDockerCompose
   releaseCerts
 }
 

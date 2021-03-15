@@ -133,8 +133,8 @@ function networkUp() {
   checkPrereqs
   # generate artifacts if they don't exist
   if [ ! -d "network-cache/peerOrganizations" ]; then
-    echo "Please run \"prepare-certs.sh\" first!"
-    exit 1
+    echo "Didn't find certs, prepare certs first!"
+    ./prepareCerts.sh
   fi
 
   for i in "${!PeerAddress[@]}"; do
@@ -152,6 +152,11 @@ function networkUp() {
     # if [ "${DATABASE}" == "couchdb" ]; then
     #   COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILE_COUCH}"
     # fi
+
+    # start up orderer if it is the first node
+    if [[ $i -eq 0 ]]; then
+      COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
+    fi
 
     ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1"
   done
