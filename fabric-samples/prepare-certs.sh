@@ -8,6 +8,7 @@ export FABRIC_CFG_PATH=${PWD}/network-cache
 export VERBOSE=false
 
 source ./network.config
+source ./.env
 source scriptUtils.sh
 
 function releaseCerts() {
@@ -27,30 +28,6 @@ function releaseCerts() {
   rm -f networkCache.tar.gz
 }
 
-function cleanLogs() {
-  rm -f ~/EASC/federated-learning-master/result-record_*.txt
-  for i in "${!PeerAddress[@]}"; do
-  	addrIN=(${PeerAddress[i]//:/ })
-    ssh ubuntu@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
-  done
-}
-
-function cleanCerts() {
-  docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
-  clearContainers
-  removeUnwantedImages
-  rm -rf system-genesis-block/*.block networkCache.tar.gz network-cache/* 
-  rm -rf channel-artifacts log.txt fabcar.tar.gz fabcar
-
-  for i in "${!PeerAddress[@]}"; do
-  	addrIN=(${PeerAddress[i]//:/ })
-    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/ && ./network.sh down && rm -rf network-cache/*"
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && rm -rf network-cache/*"
-  done
-  # clean wallet
-  rm -f ../blockchain-server/routes/rest/wallet/*
-}
-
 function createOrgs() {
 
   if [ -d "network-cache/peerOrganizations" ]; then
@@ -58,27 +35,25 @@ function createOrgs() {
   fi
 
   # Create crypto material using cryptogen
-  if [ "$CRYPTO" == "cryptogen" ]; then
-    which cryptogen
-    if [ "$?" -ne 0 ]; then
-      fatalln "cryptogen tool not found. exiting"
-    fi
-    infoln "Generate certificates using cryptogen tool"
-
-    infoln "Create Orgs Identities"
-
-    set -x
-    cryptogen generate --config=./network-cache/crypto-config.yaml --output="network-cache"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
-    fi
-
-    for i in "${!PeerAddress[@]}"; do
-      prepareID org$((i+1)) Org$((i+1))MSP
-    done
+  which cryptogen
+  if [ "$?" -ne 0 ]; then
+    fatalln "cryptogen tool not found. exiting"
   fi
+  infoln "Generate certificates using cryptogen tool"
+
+  infoln "Create Orgs Identities"
+
+  set -x
+  cryptogen generate --config=./network-cache/crypto-config.yaml --output="network-cache"
+  res=$?
+  { set +x; } 2>/dev/null
+  if [ $res -ne 0 ]; then
+    fatalln "Failed to generate certificates..."
+  fi
+
+  for i in "${!PeerAddress[@]}"; do
+    prepareID org$((i+1)) Org$((i+1))MSP
+  done
 
   echo
   echo "Generate CCP files for Orgs"
@@ -169,7 +144,7 @@ function checkPrereqs() {
   # use the fabric tools container to see if the samples and binaries match your
   # docker images
   LOCAL_VERSION=$(peer version | sed -ne 's/ Version: //p')
-  DOCKER_IMAGE_VERSION=$(docker run --rm hyperledger/fabric-tools:$IMAGETAG peer version | sed -ne 's/ Version: //p' | head -1)
+  DOCKER_IMAGE_VERSION=$(docker run --rm hyperledger/fabric-tools:$IMAGE_TAG peer version | sed -ne 's/ Version: //p' | head -1)
 
   echo "LOCAL_VERSION=$LOCAL_VERSION"
   echo "DOCKER_IMAGE_VERSION=$DOCKER_IMAGE_VERSION"
@@ -346,36 +321,6 @@ function main() {
   generateDockerCompose
   releaseCerts
 }
-
-# Obtain the OS and Architecture string that will be used to select the correct
-# native binaries for your platform, e.g., darwin-amd64 or linux-amd64
-OS_ARCH=$(echo "$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/mingw64_nt.*/windows/')-$(uname -m | sed 's/x86_64/amd64/g')" | awk '{print tolower($0)}')
-# Using crpto vs CA. default is cryptogen
-CRYPTO="cryptogen"
-# timeout duration - the duration the CLI should wait for a response from
-# another container before giving up
-MAX_RETRY=5
-# default for delay between commands
-CLI_DELAY=3
-# channel name defaults to "mychannel"
-CHANNEL_NAME="mychannel"
-# use this as the default docker-compose yaml definition
-COMPOSE_FILE_BASE=docker/docker-compose-test-net.yaml
-# docker-compose.yaml file if you are using couchdb
-COMPOSE_FILE_COUCH=docker/docker-compose-couch.yaml
-# certificate authorities compose file
-COMPOSE_FILE_CA=docker/docker-compose-ca.yaml
-#
-# use golang as the default language for chaincode
-CC_SRC_LANGUAGE=golang
-# Chaincode version
-VERSION=1
-# default image tag
-IMAGETAG="latest"
-# default ca image tag
-CA_IMAGETAG="latest"
-# default database
-DATABASE="goleveldb"
 
 main
 
