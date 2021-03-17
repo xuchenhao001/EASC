@@ -8,3 +8,4 @@ wallet/
 result-record_*
 output/
 *.log
+raft/hraftd

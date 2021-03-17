@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 type SetupRequest struct {
 	LeaderAddr   string `json:"leaderAddr"`
+	LeaderRaftAddr  string `json:"leaderRaftAddr"`
 	LeaderId   string `json:"leaderId"`
 	ClientAddrs  []string `json:"clientAddrs"`
 	ClientRaftAddrs  []string `json:"clientRaftAddrs"`
@@ -36,8 +38,11 @@ type Store interface {
 	// Join joins the node, identitifed by nodeID and reachable at addr, to the cluster.
 	Join(nodeID string, addr string) error
 
-	// Open start up the first node of cluster
+	// Open start up the first node of cluster.
 	Open(enableSingle bool, localID string) error
+
+	// GetLeader return the leader information. It may return empty string if there is no current leader.
+	GetLeader() string
 }
 
 // Service provides HTTP service.
@@ -98,7 +103,9 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleSetup(w, r)
 	} else if r.URL.Path == "/reset" {
 		s.handleReset(w, r)
-	} else {
+	} else if r.URL.Path == "/info" {
+		s.handleInfo(w, r)
+	}else {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
@@ -115,12 +122,32 @@ func (s *Service) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.Open(true, m.LeaderId); err != nil {
 		log.Fatalf("failed to open leader store: %s", err.Error())
 	}
-	time.Sleep(3*time.Second)
+
+	// wait for the leader to be successfully elected
+	for wait := true; wait; {
+		log.Printf("[Leader] wait leader to be setup...")
+		time.Sleep( 1*time.Second )
+		getInfoURL := "http://" + m.LeaderAddr + "/info"
+		res, err := sendRequest(getInfoURL, []byte(""))
+		if err != nil {
+			log.Fatalf("failed to get leader info: %s", err.Error())
+		}
+		var body map[string]string
+		if err := json.Unmarshal(res, &body); err != nil {
+			log.Fatalf("failed to unmarshal leader info: %s", err.Error())
+		}
+		log.Printf("[Leader] acquired leader address: %s", body["leaderAddr"])
+		if body["leaderAddr"] == m.LeaderRaftAddr {
+			log.Printf("[Leader] leader setting finished!")
+			wait = false
+		}
+	}
+
 	// setup clients then
 	for i := range m.ClientAddrs {
 		// reset clients first
 		resetURL := "http://" + m.ClientAddrs[i] + "/reset"
-		if err := sendRequest(resetURL, []byte("")); err != nil {
+		if _, err := sendRequest(resetURL, []byte("")); err != nil {
 			log.Fatalf("failed to reset client: %s", err.Error())
 		}
 
@@ -137,24 +164,35 @@ func (s *Service) handleReset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func sendRequest(url string, requestBody []byte) error {
+// return leader information
+func (s *Service) handleInfo(w http.ResponseWriter, r *http.Request) {
+	leaderAddr := s.store.GetLeader()
+	b, err := json.Marshal(map[string]string{"leaderAddr": leaderAddr})
+	if err != nil {
+		log.Fatalf("failed to marshal leader address: %s", err.Error())
+	}
+	io.WriteString(w, string(b))
+	return
+}
+
+func sendRequest(url string, requestBody []byte) ([]byte,error) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBody))
 	if req == nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	fmt.Println("request response Status:", resp.Status)
 	//fmt.Println("response Headers:", resp.Header)
-	//body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := ioutil.ReadAll(resp.Body)
 	//fmt.Println("response Body:", string(body))
-	return nil
+	return body, nil
 }
 
 func (s *Service) handleJoin(w http.ResponseWriter, r *http.Request) {
