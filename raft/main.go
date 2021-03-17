@@ -58,6 +58,9 @@ func main() {
 	//if err := s.Open(joinAddr == "", nodeID); err != nil {
 	//	log.Fatalf("failed to open store: %s", err.Error())
 	//}
+	if err := s.InitRaftTransport(); err != nil {
+		log.Fatalf("failed to initiate raft transport: %s", err.Error())
+	}
 
 	h := httpd.New(httpAddr, nodeID, s)
 	if err := h.Start(); err != nil {

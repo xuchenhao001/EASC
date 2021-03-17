@@ -37,6 +37,7 @@ type command struct {
 type Store struct {
 	RaftDir  string
 	RaftBind string
+	transport *raft.NetworkTransport
 	inmem    bool
 
 	mu sync.Mutex
@@ -56,23 +57,34 @@ func New(inmem bool) *Store {
 	}
 }
 
-// Open opens the store. If enableSingle is set, and there are no existing peers,
-// then this node becomes the first node, and therefore leader, of the cluster.
-// localID should be the server identifier for this node.
-func (s *Store) Open(enableSingle bool, localID string) error {
-	// Setup Raft configuration.
-	config := raft.DefaultConfig()
-	config.LocalID = raft.ServerID(localID)
-
+// Init Raft TCP transport
+func (s *Store) InitRaftTransport() error {
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
 	if err != nil {
 		return err
 	}
-	transport, err := raft.NewTCPTransport(s.RaftBind, addr, 3, 10*time.Second, os.Stderr)
+	s.transport, err = raft.NewTCPTransport(s.RaftBind, addr, 3, 10*time.Second, os.Stderr)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Open opens the store. If enableSingle is set, and there are no existing peers,
+// then this node becomes the first node, and therefore leader, of the cluster.
+// localID should be the server identifier for this node.
+func (s *Store) Open(enableSingle bool, localID string) error {
+	// if there is already a raft instance, shut it down.
+	if s.raft != nil {
+		log.Printf("raft instance detected! shutdown first!")
+		if err := s.raft.Shutdown().Error(); err != nil {
+			log.Fatalf("failed to shutdown: %s", err.Error())
+		}
+	}
+	// Setup Raft configuration.
+	config := raft.DefaultConfig()
+	config.LocalID = raft.ServerID(localID)
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := raft.NewFileSnapshotStore(s.RaftDir, retainSnapshotCount, os.Stderr)
@@ -96,7 +108,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	}
 
 	// Instantiate the Raft systems.
-	ra, err := raft.NewRaft(config, (*fsm)(s), logStore, stableStore, snapshots, transport)
+	ra, err := raft.NewRaft(config, (*fsm)(s), logStore, stableStore, snapshots, s.transport)
 	if err != nil {
 		return fmt.Errorf("new raft: %s", err)
 	}
@@ -107,7 +119,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 			Servers: []raft.Server{
 				{
 					ID:      config.LocalID,
-					Address: transport.LocalAddr(),
+					Address: s.transport.LocalAddr(),
 				},
 			},
 		}
