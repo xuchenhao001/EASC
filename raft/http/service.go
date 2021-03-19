@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -101,11 +102,15 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleJoin(w, r)
 	} else if r.URL.Path == "/setup" {
 		s.handleSetup(w, r)
-	} else if r.URL.Path == "/reset" {
-		s.handleReset(w, r)
+	} else if r.URL.Path == "/init" {
+		s.handleInit(w, r)
 	} else if r.URL.Path == "/info" {
 		s.handleInfo(w, r)
-	}else {
+	} else if r.URL.Path == "/shutdown" {
+		s.handleShutdown(w, r)
+	} else if r.URL.Path == "/kill" {
+		s.handleKill(w, r)
+	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
@@ -143,10 +148,10 @@ func (s *Service) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// setup clients then
+	// setup clients
 	for i := range m.ClientAddrs {
 		// reset clients first
-		resetURL := "http://" + m.ClientAddrs[i] + "/reset"
+		resetURL := "http://" + m.ClientAddrs[i] + "/init"
 		if _, err := sendRequest(resetURL, []byte("")); err != nil {
 			log.Fatalf("failed to reset client: %s", err.Error())
 		}
@@ -157,8 +162,8 @@ func (s *Service) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Do reset to clients before let them join into the raft cluster
-func (s *Service) handleReset(w http.ResponseWriter, r *http.Request) {
+// Do init to clients before let them join into the raft cluster
+func (s *Service) handleInit(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.Open(false, s.nodeId); err != nil {
 		log.Fatalf("failed to open client store: %s", err.Error())
 	}
@@ -216,6 +221,36 @@ func (s *Service) handleJoin(w http.ResponseWriter, r *http.Request) {
 			log.Fatalf("failed to join the client to the cluster: %s", err.Error())
 		}
 	}
+}
+
+// remote shutdown raft cluster
+func (s *Service) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	var m SetupRequest
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// kill clients first
+	for i := range m.ClientAddrs {
+		resetURL := "http://" + m.ClientAddrs[i] + "/kill"
+		if _, err := sendRequest(resetURL, []byte("")); err != nil {
+			log.Fatalf("failed to kill client: %s", err.Error())
+		}
+	}
+	// then kill itself
+	w.WriteHeader(http.StatusOK)
+	go func() {
+		os.Exit(0)
+	}()
+}
+
+// remote controllable kill process
+func (s *Service) handleKill(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	go func() {
+		os.Exit(0)
+	}()
 }
 
 func (s *Service) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
