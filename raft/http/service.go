@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -176,7 +175,8 @@ func (s *Service) handleInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("failed to marshal leader address: %s", err.Error())
 	}
-	io.WriteString(w, string(b))
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(b)
 	return
 }
 
@@ -280,7 +280,8 @@ func (s *Service) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		io.WriteString(w, string(b))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
 
 	case "POST":
 		// Read the value from the POST body.

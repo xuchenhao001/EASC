@@ -8,24 +8,69 @@ A simple example system like hraftd makes it easy to study the Raft consensus pr
 
 ## Functions
 
-TODO: After finished all functions, write docs to introduce the functions.
+The functions included in this project are as shown below:
 
 ### RAFT Server
 
-Listen at specific port, waiting for further commands.
+Start up raft server and waiting for the requests with following bash commands:
+
+```bash
+# for node 1
+./hraftd -id node1 -haddr <node-1-addr>:7150 -raddr <node-1-addr>:7151 ./node1
+# for node 2
+./hraftd -id node2 -haddr <node-2-addr>:8150 -raddr <node-2-addr>:8151 ./node2
+# for node 3
+./hraftd -id node3 -haddr <node-3-addr>:9150 -raddr <node-3-addr>:9151 ./node3
+```
+
+> `haddr` means hraft listen address; `raddr` means raft listen address. The last directory parameter is necessary for the storage of snapshots.
+
+After start up, the servers are waiting for the setup request to setup a new raft cluster.
 
 ### Setup
 
-Set up RAFT network according to the request.
+To set up RAFT network, send `POST` to `http://<node-1-addr>:7150/setup` with following json body:
 
-### Reset
-
-Shutdown and clean the RAFT network.
+```json
+{
+	"leaderAddr": "<node-1-addr>:7150",
+	"leaderRaftAddr": "<node-1-addr>:7151",
+	"leaderId": "1",
+	"clientAddrs": ["<node-2-addr>:8150", "<node-3-addr>:9150"],
+	"clientRaftAddrs": ["<node-2-addr>:8151", "<node-3-addr>:9151"],
+	"clientIds": ["2", "3"]
+}
+```
 
 ### Set
 
-Set key-value into RAFT database.
+Set key-value into RAFT database. Send `POST` to `http://<node-1-addr>:7150/key` with following json body:
+
+```json
+{
+	"myKey": "myValue"
+}
+```
 
 ### Get
 
-Read value based on key from RAFT database.
+Read value based on key from RAFT database. Send `GET` request to `http://<node-1-addr>:7150/key/mykey` and will get the response body:
+
+```json
+{"myKey":"myValue"}
+```
+
+### Shutdown
+
+To shutdown RAFT network (exit the processes), send `POST` to `http://<node-1-addr>:7150/shutdown` with following json body:
+
+```json
+{
+	"leaderAddr": "<node-1-addr>:7150",
+	"leaderRaftAddr": "<node-1-addr>:7151",
+	"leaderId": "1",
+	"clientAddrs": ["<node-2-addr>:8150", "<node-3-addr>:9150"],
+	"clientRaftAddrs": ["<node-2-addr>:8151", "<node-3-addr>:9151"],
+	"clientIds": ["2", "3"]
+}
+```
