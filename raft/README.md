@@ -6,6 +6,17 @@ hraftd is a reference example use of the [Hashicorp Raft implementation v1.0](ht
 
 A simple example system like hraftd makes it easy to study the Raft consensus protocol in general, and Hashicorp's Raft implementation in particular. It can be run on Linux, OSX, and Windows.
 
+## Build
+
+Prerequisite: [Golang v1.15](https://golang.org/) or later.
+
+```bash
+$ go mod download
+$ go build
+```
+
+Then you will get the `hraftd` binary file under this directory.
+
 ## Functions
 
 The functions included in this project are as shown below:
