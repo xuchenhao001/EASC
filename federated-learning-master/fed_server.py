@@ -10,6 +10,7 @@ import random
 import time
 import socket
 import statistics
+import subprocess
 
 matplotlib.use('Agg')
 import copy
@@ -38,8 +39,8 @@ hyperpara_min = 0.5
 hyperpara_max = 0.8
 # rounds to negotiate alpha
 negotiate_round = 10
-blockchain_server_url = "http://10.137.3.70:3000/invoke/mychannel/fabcar"
-trigger_url = "http://10.137.3.70:8888/trigger"
+blockchain_server_url = ""
+trigger_url = ""
 # blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
 # trigger_url = "http://localhost:8888/trigger"
 # TO BE CHANGED FINISHED
@@ -72,6 +73,16 @@ ip_map = {}
 def test(data):
     detail = {"data": data}
     return "yes", detail
+
+
+# returns variable from sourcing a file
+def env_from_sourcing(file_to_source_path, variable_name):
+    source = 'source %s && export MYVAR=$(echo "${%s[@]}")' % (file_to_source_path, variable_name)
+    # dump = '/usr/bin/python3 -c "import os, json; print(json.dumps(dict(os.getenv(\'MYVAR\'))))"'
+    dump = '/usr/bin/python3 -c "import os, json; print(os.getenv(\'MYVAR\'))"'
+    pipe = subprocess.Popen(['/bin/bash', '-c', '%s && %s' % (source, dump)], stdout=subprocess.PIPE)
+    # return json.loads(pipe.stdout.read())
+    return pipe.stdout.read().decode("utf-8").rstrip()
 
 
 async def http_client_post(url, body_data):
@@ -107,6 +118,15 @@ def init():
     global skew_users2
     global skew_users3
     global skew_users4
+    global blockchain_server_url
+    global trigger_url
+    # parse network.config and read the peer addresses
+    PeerAddressVar = env_from_sourcing("../fabric-samples/network.config", "PeerAddress")
+    peerAddressList = PeerAddressVar.split(' ')
+    peerHeaderAddr = peerAddressList[0].split(":")[0]
+    blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
+    trigger_url = "http://" + peerHeaderAddr + ":8888/trigger"
+
     # parse args
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
