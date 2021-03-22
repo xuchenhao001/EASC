@@ -4,8 +4,11 @@
 import asyncio
 import base64
 import gzip
+import hashlib
 import json
 import matplotlib
+import math
+import os
 import random
 import time
 import socket
@@ -39,11 +42,15 @@ hyperpara_min = 0.5
 hyperpara_max = 0.8
 # rounds to negotiate alpha
 negotiate_round = 10
+# committee members proportion
+committee_proportion = 0.3
+# TO BE CHANGED FINISHED
+
+# NOT TO TOUCH VARIABLES BELOW
 blockchain_server_url = ""
 trigger_url = ""
 # blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
 # trigger_url = "http://localhost:8888/trigger"
-# TO BE CHANGED FINISHED
 total_epochs = 0
 args = None
 net_glob = None
@@ -68,6 +75,25 @@ g_start_time = {}
 g_train_time = {}
 g_test_time = {}
 ip_map = {}
+peerAddressList = []
+
+
+######## Federated Learning process ########
+# 0. the client send a train request to BC-node1-python
+# 1. (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
+#    to the ledger.
+# 2. BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
+#    send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
+# 3. BC-nodes-python train local model based on previous round's local model, send local model to the committee leader.
+# 4. committee leader received local model, send hash of local model to the ledger.
+# 5. committee leader received all local models, aggregate to global model, then send the download link of global model
+#    and the hash of global model to the ledger.
+# 6. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
+#    alpha-accuracy map, which will be uploaded to the committee leader.
+# 7. committee leader received alpha-accuracy map, send to the ledger
+# 8. after gathering all alpha-accuracy maps, pick up the appropriate alpha according to the rule, save to the ledger.
+# 9. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
+#    new local model. Test the new local model, then repeat from step 2.
 
 
 def test(data):
@@ -102,7 +128,7 @@ async def http_client_post(url, body_data):
         return None
 
 
-# STEP #1.1
+# STEP #1
 # Federated Learning: init step
 def init():
     global args
@@ -120,9 +146,11 @@ def init():
     global skew_users4
     global blockchain_server_url
     global trigger_url
+    global peerAddressList
     # parse network.config and read the peer addresses
-    PeerAddressVar = env_from_sourcing("../fabric-samples/network.config", "PeerAddress")
-    peerAddressList = PeerAddressVar.split(' ')
+    real_path = os.path.dirname(os.path.realpath(__file__))
+    peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
+    peerAddressList = peerAddressVar.split(' ')
     peerHeaderAddr = peerAddressList[0].split(":")[0]
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
     trigger_url = "http://" + peerHeaderAddr + ":8888/trigger"
@@ -131,12 +159,15 @@ def init():
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
     total_epochs = args.epochs
+    # parse participant number
+    args.num_users = len(peerAddressList)
 
     # load dataset and split users
     if args.dataset == 'mnist':
         trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-        dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
-        dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+        mnist_data_path = os.path.join(real_path, "../data/mnist/")
+        dataset_train = datasets.MNIST(mnist_data_path, train=True, download=True, transform=trans_mnist)
+        dataset_test = datasets.MNIST(mnist_data_path, train=False, download=True, transform=trans_mnist)
         # sample users
         if args.iid:
             # dict_users = mnist_iid(dataset_train, 1)
@@ -148,8 +179,9 @@ def init():
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
-        dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
+        cifar_data_path = os.path.join(real_path, "../data/cifar/")
+        dataset_train = datasets.CIFAR10(cifar_data_path, train=True, download=True, transform=trans_cifar)
+        dataset_test = datasets.CIFAR10(cifar_data_path, train=False, download=True, transform=trans_cifar)
         if args.iid:
             # dict_users = cifar_iid(dataset_train, 1)
             dict_users = cifar_iid(dataset_train, args.num_users)
@@ -177,26 +209,92 @@ def init():
         net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
     else:
         exit('Error: unrecognized model')
+    # finally trained the initial local model, which will be treated as first global model.
     net_glob.train()
 
 
-# STEP #1.2
-async def prepare():
-    # copy weights
-    w_glob = net_glob.state_dict()  # change model to parameters
-    # upload w_glob onto blockchian
-    convert_tensor_value_to_numpy(w_glob)
-    w_glob_compressed = compress_data(w_glob)
+# STEP #1
+async def start():
     print("####################\nEpoch #", total_epochs, " start now\n####################")
+    # generate md5 hash from model, which is treated as global model of previous round.
+    model_md5 = generate_md5_hash(net_glob)
+    # upload md5 hash to ledger
     body_data = {
-        'message': 'prepare',
+        'message': 'Start',
         'data': {
-            'w_glob': w_glob_compressed,
+            'global_hash': model_md5,
             'user_number': args.num_users,
         },
         'epochs': total_epochs
     }
     await http_client_post(blockchain_server_url, body_data)
+
+
+# STEP #2
+async def prepare(data, uuid, epochs):
+    print('Received boot strap request for user: ' + uuid)
+    md5hash = data.get("global_hash")
+    committee_leader_id = int(md5hash, 16) % args.num_users + 1
+    committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
+    committee_highest_id = committee_proportion_num + committee_leader_id - 1
+    # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
+    if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
+        print("# BOOT LOCAL RAFT PROCESS! #")
+        myIP = peerAddressList[int(uuid) - 1].split(":")[0]
+        myPort = peerAddressList[int(uuid) - 1].split(":")[1]
+        httpPort = int(myPort) + 100
+        raftPort = int(myPort) + 101
+        boot_local_raft_proc(uuid, myIP, httpPort, raftPort)
+    # wait for a while in case raft processes on some nodes are not running.
+    await gen.sleep(5)
+    if int(uuid) == committee_leader_id:
+        print("Find out the leader ID: " + uuid)
+        print("# BOOT RAFT CONSENSUS NETWORK! #")
+
+        leaderIP = peerAddressList[int(uuid) - 1].split(":")[0]
+        leaderPort = peerAddressList[int(uuid) - 1].split(":")[1]
+        httpPort = int(leaderPort) + 100
+        raftPort = int(leaderPort) + 101
+        leaderAddr = leaderIP + ":" + str(httpPort)
+        leaderRaftAddr = leaderIP + ":" + str(raftPort)
+
+        clientAddrs = []
+        clientRaftAddrs = []
+        clientIds = []
+        for id in range(int(uuid), committee_highest_id):
+            if id > args.num_users:
+                index = id % args.num_users
+                clientIds.append(str(id))
+        body_data = {
+            'leaderAddr': leaderAddr,
+            'leaderRaftAddr': leaderRaftAddr,
+            'leaderId': str(uuid),
+            'clientAddrs': 'Start',
+            'clientRaftAddrs': 'Start',
+            'clientIds': 'Start',
+        }
+
+
+# boot local raft process, preparing for the raft consensus algorithm
+def boot_local_raft_proc(uuid, ip, http_port, raft_port):
+    node_id = "node" + str(uuid)
+    haddr = ip + ":" + str(http_port)
+    raddr = ip + ":" + str(raft_port)
+    real_path = os.path.dirname(os.path.realpath(__file__))
+    hraftd_path = os.path.join(real_path, "../raft/hraftd")
+    snapshot_path = os.path.join(real_path, "../raft/" + node_id)
+    subprocess.Popen([hraftd_path, "-id", node_id, "-haddr", haddr, "-raddr", raddr, snapshot_path])
+    return
+
+
+# generate raft address from peer address
+def generate_raft_addr(peer_addr):
+    print('generate peer addr for: ' + peer_addr)
+    ip = peer_addr.split(":")[0]
+    port = peer_addr.split(":")[1]
+    http_port = str(int(port) + 100)  # raft http port is (100 + peer port)
+    raft_port = str(int(port) + 101)  # raft port is (101 + peer port)
+    return {'httpAddr': ip + ':' + http_port, 'raftAddr': ip + ':' + raft_port}
 
 
 # STEP #3
@@ -526,6 +624,14 @@ def decompress_data(data):
     return json.loads(decompressed)
 
 
+# generate md5 hash for global model
+def generate_md5_hash(model):
+    w_model = model.state_dict()
+    convert_tensor_value_to_numpy(w_model)
+    data_md5 = hashlib.md5(json.dumps(w_model, sort_keys=True, cls=NumpyEncoder).encode('utf-8')).hexdigest()
+    return data_md5
+
+
 class MainHandler(web.RequestHandler):
 
     async def get(self):
@@ -548,6 +654,10 @@ class MainHandler(web.RequestHandler):
         message = data.get("message")
         if message == "test":
             test(data.get("data"))
+        elif message == "start":
+            asyncio.ensure_future(start())
+        elif message == "prepare":
+            asyncio.ensure_future(prepare(data.get("data"), data.get("uuid"), data.get("epochs")))
         elif message == "prepare":
             asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
         elif message == "security_poll":

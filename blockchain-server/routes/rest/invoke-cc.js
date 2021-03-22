@@ -19,53 +19,9 @@ router.post('/invoke/:channelName/:chaincodeName', async function (req, res) {
   let channelName = req.params.channelName;
   let chaincodeName = req.params.chaincodeName;
   let body = req.body;
-  if (body.message === 'prepare') {
-    logger.info("Received request type: prepare")
-    await invoke(res, channelName, chaincodeName, 'Prepare', JSON.stringify(req.body));
-  }
-  else if (body.message === 'train') {
-    logger.info("Received request type: train")
-    await invoke(res, channelName, chaincodeName,'Train', JSON.stringify(req.body));
-  }
-  else if (body.message === 'check_train_read') {
-    logger.info("Received request type: check_train_read")
-    await invoke(res, channelName, chaincodeName,'CheckTrainRead', JSON.stringify(req.body));
-  }
-  else if (body.message === 'train_ready') {
-    logger.info("Received request type: train_ready")
-    await invoke(res, channelName, chaincodeName,'TrainReady', JSON.stringify(req.body));
-  }
-  else if (body.message === 'outlier_record') {
-    logger.info("Received request type: outlier_record")
-    await invoke(res, channelName, chaincodeName,'OutlierRecord', JSON.stringify(req.body));
-  }
-  else if (body.message === 'check_poll_read') {
-    logger.info("Received request type: check_poll_read")
-    await invoke(res, channelName, chaincodeName,'CheckPollRead', JSON.stringify(req.body));
-  }
-  else if (body.message === 'poll_ready') {
-    logger.info("Received request type: poll_ready")
-    await query(res, channelName, chaincodeName,'PollReady', JSON.stringify(req.body));
-  }
-  else if (body.message === 'w_glob') {
-    logger.info("Received request type: w_glob")
-    await invoke(res, channelName, chaincodeName,'WGlob', JSON.stringify(req.body));
-  }
-  else if (body.message === 'negotiate') {
-    logger.info("Received request type: negotiate")
-    await invoke(res, channelName, chaincodeName, 'Negotiate', JSON.stringify(req.body));
-  }
-  else if (body.message === 'check_negotiate_read') {
-    logger.info("Received request type: check_negotiate_read")
-    await invoke(res, channelName, chaincodeName, 'CheckNegotiateRead', JSON.stringify(req.body));
-  }
-  else if (body.message === 'negotiate_ready') {
-    logger.info("Received request type: negotiate_ready")
-    await invoke(res, channelName, chaincodeName, 'NegotiateReady', JSON.stringify(req.body));
-  }
-  else {
-    common.responseBadRequestError(res, 'No such request: ' + body.message);
-  }
+
+  logger.info("Received request type: " + body.message)
+  await invoke(res, channelName, chaincodeName, body.message, JSON.stringify(req.body));
 });
 
 

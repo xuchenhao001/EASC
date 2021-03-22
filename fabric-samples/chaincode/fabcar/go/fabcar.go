@@ -54,8 +54,8 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 }
 
 // STEP #2
-func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
-	fmt.Println("[PREPARE MSG] Received")
+func (s *SmartContract) Start(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[START MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
 
 	recMsg := new(HttpMessage)
@@ -75,6 +75,7 @@ func (s *SmartContract) Prepare(ctx contractapi.TransactionContextInterface, rec
 	fmt.Println("Successfully loaded user number: ", userNum)
 
 	recMsg.Uuid = myuuid
+	recMsg.Message = "prepare"
 	sendMsgAsBytes, _ := json.Marshal(recMsg)
 
 	go sendPostRequest(sendMsgAsBytes, "PREPARE")
