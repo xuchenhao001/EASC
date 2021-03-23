@@ -75,7 +75,8 @@ g_start_time = {}
 g_train_time = {}
 g_test_time = {}
 ip_map = {}
-peerAddressList = []
+peer_address_list = []
+shutdown_raft = ""
 
 
 ######## Federated Learning process ########
@@ -146,12 +147,12 @@ def init():
     global skew_users4
     global blockchain_server_url
     global trigger_url
-    global peerAddressList
+    global peer_address_list
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
     peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
-    peerAddressList = peerAddressVar.split(' ')
-    peerHeaderAddr = peerAddressList[0].split(":")[0]
+    peer_address_list = peerAddressVar.split(' ')
+    peerHeaderAddr = peer_address_list[0].split(":")[0]
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
     trigger_url = "http://" + peerHeaderAddr + ":8888/trigger"
 
@@ -160,7 +161,7 @@ def init():
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
     total_epochs = args.epochs
     # parse participant number
-    args.num_users = len(peerAddressList)
+    args.num_users = len(peer_address_list)
 
     # load dataset and split users
     if args.dataset == 'mnist':
@@ -232,6 +233,7 @@ async def start():
 
 # STEP #2
 async def prepare(data, uuid, epochs):
+    global shutdown_raft
     print('Received boot strap request for user: ' + uuid)
     md5hash = data.get("global_hash")
     committee_leader_id = int(md5hash, 16) % args.num_users + 1
@@ -240,10 +242,10 @@ async def prepare(data, uuid, epochs):
     # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
     if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
         print("# BOOT LOCAL RAFT PROCESS! #")
-        myIP = peerAddressList[int(uuid) - 1].split(":")[0]
-        myPort = peerAddressList[int(uuid) - 1].split(":")[1]
-        httpPort = int(myPort) + 100
-        raftPort = int(myPort) + 101
+        myIP = peer_address_list[int(uuid) - 1].split(":")[0]
+        myPort = peer_address_list[int(uuid) - 1].split(":")[1]
+        httpPort = int(myPort) + 99
+        raftPort = int(myPort) + 100
         boot_local_raft_proc(uuid, myIP, httpPort, raftPort)
     # wait for a while in case raft processes on some nodes are not running.
     await gen.sleep(5)
@@ -251,28 +253,53 @@ async def prepare(data, uuid, epochs):
         print("Find out the leader ID: " + uuid)
         print("# BOOT RAFT CONSENSUS NETWORK! #")
 
-        leaderIP = peerAddressList[int(uuid) - 1].split(":")[0]
-        leaderPort = peerAddressList[int(uuid) - 1].split(":")[1]
-        httpPort = int(leaderPort) + 100
-        raftPort = int(leaderPort) + 101
-        leaderAddr = leaderIP + ":" + str(httpPort)
-        leaderRaftAddr = leaderIP + ":" + str(raftPort)
+        leader_ip = peer_address_list[int(uuid) - 1].split(":")[0]
+        leader_port = peer_address_list[int(uuid) - 1].split(":")[1]
+        leader_http_port = int(leader_port) + 99
+        leader_raft_port = int(leader_port) + 100
+        leader_addr = leader_ip + ":" + str(leader_http_port)
+        leader_raft_addr = leader_ip + ":" + str(leader_raft_port)
 
-        clientAddrs = []
-        clientRaftAddrs = []
-        clientIds = []
-        for id in range(int(uuid), committee_highest_id):
-            if id > args.num_users:
-                index = id % args.num_users
-                clientIds.append(str(id))
+        client_addrs = []
+        client_raft_addrs = []
+        client_ids = []
+        # i starts from the leader id and end at committee highest id
+        print("committee_highest_id: " + str(committee_highest_id))
+        for i in range(int(uuid) + 1, committee_highest_id + 1):
+            index = 0
+            if i > args.num_users:
+                index = i % args.num_users
+            else:
+                index = i
+            client_ip = peer_address_list[index - 1].split(":")[0]
+            client_port = peer_address_list[index - 1].split(":")[1]
+            client_http_port = int(client_port) + 99
+            client_raft_port = int(client_port) + 100
+            client_ids.append(str(index))
+            client_addrs.append(client_ip + ":" + str(client_http_port))
+            client_raft_addrs.append(client_ip + ":" + str(client_raft_port))
         body_data = {
-            'leaderAddr': leaderAddr,
-            'leaderRaftAddr': leaderRaftAddr,
+            'message': 'raft_start',
+            'leaderAddr': leader_addr,
+            'leaderRaftAddr': leader_raft_addr,
             'leaderId': str(uuid),
-            'clientAddrs': 'Start',
-            'clientRaftAddrs': 'Start',
-            'clientIds': 'Start',
+            'clientAddrs': client_addrs,
+            'clientRaftAddrs': client_raft_addrs,
+            'clientIds': client_ids,
         }
+        shutdown_raft = body_data
+        await http_client_post("http://" + leader_addr + "/setup", body_data)
+
+        # finally send raft network info to the ledger
+        body_data = {
+            'message': 'RaftInfo',
+            'data': {
+                'leader_addr': leader_addr,
+            },
+            'uuid': uuid,
+            'epochs': epochs,
+        }
+        await http_client_post(blockchain_server_url, body_data)
 
 
 # boot local raft process, preparing for the raft consensus algorithm

@@ -83,6 +83,21 @@ func (s *SmartContract) Start(ctx contractapi.TransactionContextInterface, recei
 	return nil
 }
 
+// STEP #2
+func (s *SmartContract) RaftInfo(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[RAFT INFO MSG] Received")
+	receiveMsgBytes := []byte(receiveMsg)
+	recMsg := new(HttpMessage)
+	_ = json.Unmarshal(receiveMsgBytes, recMsg)
+
+	// store raft leader info into blockchain
+	err := saveAsMap(ctx, "raftLeaderMap", recMsg.Epochs, "", recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to save raft leader info into state. %s", err.Error())
+	}
+	return nil
+}
+
 func saveAsMap(ctx contractapi.TransactionContextInterface, keyType string, epochs int, myUUID string,
 	value interface{}) error {
 	epochsString := strconv.Itoa(epochs)
