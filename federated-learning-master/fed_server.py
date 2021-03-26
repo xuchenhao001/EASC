@@ -35,6 +35,7 @@ from tornado import httpclient, ioloop, web, gen
 np.random.seed(0)
 
 # TO BE CHANGED
+# attackers' ids, must be string type "1", "2", ...
 attackers_id = []
 # alpha minimum
 hyperpara_min = 0.5
@@ -77,6 +78,7 @@ g_test_time = {}
 ip_map = {}
 peer_address_list = []
 shutdown_raft = ""
+raft_leader_http_addr = ""
 
 
 ######## Federated Learning process ########
@@ -85,15 +87,15 @@ shutdown_raft = ""
 #    to the ledger.
 # 2. BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
 #    send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
-# 3. BC-nodes-python train local model based on previous round's local model, send local model to the committee leader.
-# 4. committee leader received local model, send hash of local model to the ledger.
-# 5. committee leader received all local models, aggregate to global model, then send the download link of global model
+# 3. BC-nodes-python train local model based on previous round's local model, send local model to the committee leader,
+#    send hash of local model to the ledger.
+# 4. committee leader received all local models, aggregate to global model, then send the download link of global model
 #    and the hash of global model to the ledger.
-# 6. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
+# 5. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
 #    alpha-accuracy map, which will be uploaded to the committee leader.
-# 7. committee leader received alpha-accuracy map, send to the ledger
-# 8. after gathering all alpha-accuracy maps, pick up the appropriate alpha according to the rule, save to the ledger.
-# 9. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
+# 6. committee leader received alpha-accuracy map, send to the ledger
+# 7. after gathering all alpha-accuracy maps, pick up the appropriate alpha according to the rule, save to the ledger.
+# 8. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
 #    new local model. Test the new local model, then repeat from step 2.
 
 
@@ -130,7 +132,6 @@ async def http_client_post(url, body_data):
 
 
 # STEP #1
-# Federated Learning: init step
 def init():
     global args
     global total_epochs
@@ -215,15 +216,18 @@ def init():
 
 
 # STEP #1
+# (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
+# to the ledger.
 async def start():
     print("####################\nEpoch #", total_epochs, " start now\n####################")
     # generate md5 hash from model, which is treated as global model of previous round.
-    model_md5 = generate_md5_hash(net_glob)
+    w = net_glob.state_dict()
+    model_md5 = generate_md5_hash(w)
     # upload md5 hash to ledger
     body_data = {
         'message': 'Start',
         'data': {
-            'global_hash': model_md5,
+            'model_hash': model_md5,
             'user_number': args.num_users,
         },
         'epochs': total_epochs
@@ -232,33 +236,31 @@ async def start():
 
 
 # STEP #2
+# BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
+# send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
 async def prepare(data, uuid, epochs):
+    global raft_leader_http_addr
     global shutdown_raft
     print('Received boot strap request for user: ' + uuid)
-    md5hash = data.get("global_hash")
+    md5hash = data.get("model_hash")
     committee_leader_id = int(md5hash, 16) % args.num_users + 1
     committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
     committee_highest_id = committee_proportion_num + committee_leader_id - 1
     # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
     if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
         print("# BOOT LOCAL RAFT PROCESS! #")
-        myIP = peer_address_list[int(uuid) - 1].split(":")[0]
-        myPort = peer_address_list[int(uuid) - 1].split(":")[1]
-        httpPort = int(myPort) + 99
-        raftPort = int(myPort) + 100
-        boot_local_raft_proc(uuid, myIP, httpPort, raftPort)
+        http_addr, raft_addr = generate_raft_addr_info(uuid)
+        boot_local_raft_proc(uuid, http_addr, raft_addr)
     # wait for a while in case raft processes on some nodes are not running.
-    await gen.sleep(5)
+    await gen.sleep(2)
+    # all nodes need to store the committee leader info for later local model upload
+    raft_leader_http_addr, raft_leader_raft_addr = generate_raft_addr_info(committee_leader_id)
+
+    # if this node is elected as committee leader, boot the raft network.
     if int(uuid) == committee_leader_id:
         print("Find out the leader ID: " + uuid)
         print("# BOOT RAFT CONSENSUS NETWORK! #")
-
-        leader_ip = peer_address_list[int(uuid) - 1].split(":")[0]
-        leader_port = peer_address_list[int(uuid) - 1].split(":")[1]
-        leader_http_port = int(leader_port) + 99
-        leader_raft_port = int(leader_port) + 100
-        leader_addr = leader_ip + ":" + str(leader_http_port)
-        leader_raft_addr = leader_ip + ":" + str(leader_raft_port)
+        leader_http_addr, leader_raft_addr = generate_raft_addr_info(uuid)
 
         client_addrs = []
         client_raft_addrs = []
@@ -271,16 +273,13 @@ async def prepare(data, uuid, epochs):
                 index = i % args.num_users
             else:
                 index = i
-            client_ip = peer_address_list[index - 1].split(":")[0]
-            client_port = peer_address_list[index - 1].split(":")[1]
-            client_http_port = int(client_port) + 99
-            client_raft_port = int(client_port) + 100
+            client_http_addr, client_raft_addr = generate_raft_addr_info(index)
             client_ids.append(str(index))
-            client_addrs.append(client_ip + ":" + str(client_http_port))
-            client_raft_addrs.append(client_ip + ":" + str(client_raft_port))
+            client_addrs.append(client_http_addr)
+            client_raft_addrs.append(client_raft_addr)
         body_data = {
             'message': 'raft_start',
-            'leaderAddr': leader_addr,
+            'leaderAddr': leader_http_addr,
             'leaderRaftAddr': leader_raft_addr,
             'leaderId': str(uuid),
             'clientAddrs': client_addrs,
@@ -288,48 +287,34 @@ async def prepare(data, uuid, epochs):
             'clientIds': client_ids,
         }
         shutdown_raft = body_data
-        await http_client_post("http://" + leader_addr + "/setup", body_data)
+        await http_client_post("http://" + leader_http_addr + "/setup", body_data)
 
         # finally send raft network info to the ledger
         body_data = {
             'message': 'RaftInfo',
             'data': {
-                'leader_addr': leader_addr,
+                'leader_addr': leader_http_addr,
             },
             'uuid': uuid,
             'epochs': epochs,
         }
         await http_client_post(blockchain_server_url, body_data)
+    else:
+        await gen.sleep(5)
 
-
-# boot local raft process, preparing for the raft consensus algorithm
-def boot_local_raft_proc(uuid, ip, http_port, raft_port):
-    node_id = "node" + str(uuid)
-    haddr = ip + ":" + str(http_port)
-    raddr = ip + ":" + str(raft_port)
-    real_path = os.path.dirname(os.path.realpath(__file__))
-    hraftd_path = os.path.join(real_path, "../raft/hraftd")
-    snapshot_path = os.path.join(real_path, "../raft/" + node_id)
-    subprocess.Popen([hraftd_path, "-id", node_id, "-haddr", haddr, "-raddr", raddr, snapshot_path])
-    return
-
-
-# generate raft address from peer address
-def generate_raft_addr(peer_addr):
-    print('generate peer addr for: ' + peer_addr)
-    ip = peer_addr.split(":")[0]
-    port = peer_addr.split(":")[1]
-    http_port = str(int(port) + 100)  # raft http port is (100 + peer port)
-    raft_port = str(int(port) + 101)  # raft port is (101 + peer port)
-    return {'httpAddr': ip + ':' + http_port, 'raftAddr': ip + ':' + raft_port}
+    # then go ahead to STEP #3, train the local model
+    # copy weights
+    w_glob = net_glob.state_dict()  # change model to parameters
+    # upload w_glob onto blockchian
+    w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
+    await train(w_glob_compressed, uuid, epochs, time.time())
 
 
 # STEP #3
 # Federated Learning: train step
-async def train(data, uuid, epochs, start_time):
+async def train(w_glob_compressed, uuid, epochs, start_time):
     print('train data now for user: ' + uuid)
-    w_glob = data.get("w_glob")
-    decompressed_w_glob = decompress_data(w_glob)
+    decompressed_w_glob = decompress_data(w_glob_compressed)
     conver_json_value_to_tensor(decompressed_w_glob)
     net_glob.load_state_dict(decompressed_w_glob)
 
@@ -341,34 +326,28 @@ async def train(data, uuid, epochs, start_time):
     if uuid in attackers_id:
         w = disturb_w(w)
     train_time = time.time() - train_start_time
-    convert_tensor_value_to_numpy(w)
-    w_compressed = compress_data(w)
+
+    # send local model to the committee leader
+    w_compressed = compress_data(convert_tensor_value_to_numpy(w))
     body_data = {
-        'message': 'train',
+        'message': 'set',
+        'uuid': str(uuid),
+        'epochs': str(epochs),
+        'w_compressed': w_compressed,
+    }
+    await http_client_post("http://" + raft_leader_http_addr + "/modelstore", body_data)
+
+    # send hash of local model to the ledger
+    model_md5 = generate_md5_hash(w)
+    body_data = {
+        'message': 'Train',
         'data': {
-            'w': w_compressed,
+            'w': model_md5,
         },
         'uuid': uuid,
         'epochs': epochs,
     }
     await http_client_post(blockchain_server_url, body_data)
-    trigger_data = {
-        'message': 'train_ready',
-        'epochs': epochs,
-        'uuid': uuid,
-        'start_time': start_time,
-        'train_time': train_time,
-    }
-    await http_client_post(trigger_url, trigger_data)
-
-
-def disturb_w(w):
-    disturbed_w = copy.deepcopy(w)
-    for name, param in w.items():
-        beta = random.random()
-        transformed_w = param * beta
-        disturbed_w[name] = transformed_w
-    return disturbed_w
 
 
 # STEP #4.1
@@ -436,8 +415,8 @@ async def security_poll(w_compressed_map, uuid, epochs):
     w_local = w_map[uuid]
 
     # upload w_glob to blockchain here
-    convert_tensor_value_to_numpy(w_glob)
-    w_glob_compressed = compress_data(w_glob)
+    np_w_glob = convert_tensor_value_to_numpy(w_glob)
+    w_glob_compressed = compress_data(np_w_glob)
     body_data = {
         'message': 'w_glob',
         'data': {
@@ -448,7 +427,7 @@ async def security_poll(w_compressed_map, uuid, epochs):
     }
     await http_client_post(blockchain_server_url, body_data)
     # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, w_glob, w_local, epochs, cross_test_time)
+    thread_negotiate = myNegotiateThread(uuid, np_w_glob, w_local, epochs, cross_test_time)
     thread_negotiate.start()
 
 
@@ -535,8 +514,7 @@ async def round_finish(data, uuid, epochs):
         w_local2[key] = alpha * decompressed_w_local[key] + (1 - alpha) * decompressed_w_glob[key]
 
     # start next round! Go to STEP #3
-    convert_tensor_value_to_numpy(w_local2)
-    compressed_w_local2 = compress_data(w_local2)
+    compressed_w_local2 = compress_data(convert_tensor_value_to_numpy(w_local2))
     data = {
         'w_glob': compressed_w_local2,
     }
@@ -556,7 +534,7 @@ async def round_finish(data, uuid, epochs):
     train_time = detail.get("train_time")
 
     # finally, test the acc_local, acc_local_skew1~4
-    conver_json_value_to_tensor(w_local2)
+    # conver_json_value_to_tensor(w_local2)
     net_glob.load_state_dict(w_local2)
     net_glob.eval()
     test_addition_start_time = time.time()
@@ -618,6 +596,46 @@ async def next_round_start(data, uuid, new_epochs):
     await train(data, uuid, new_epochs, time.time())
 
 
+# boot local raft process, preparing for the raft consensus algorithm
+def boot_local_raft_proc(uuid, http_addr, raft_addr):
+    node_id = "node" + str(uuid)
+    real_path = os.path.dirname(os.path.realpath(__file__))
+    hraftd_path = os.path.join(real_path, "../raft/hraftd")
+    snapshot_path = os.path.join(real_path, "../raft/" + node_id)
+    subprocess.Popen([hraftd_path, "-id", node_id, "-haddr", http_addr, "-raddr", raft_addr, snapshot_path])
+    return
+
+
+# generate raft address info from uuid
+def generate_raft_addr_info(uuid):
+    raft_ip = peer_address_list[int(uuid) - 1].split(":")[0]
+    raft_port = peer_address_list[int(uuid) - 1].split(":")[1]
+    http_port = int(raft_port) + 99
+    raft_port = int(raft_port) + 100
+    http_addr = raft_ip + ":" + str(http_port)
+    raft_addr = raft_ip + ":" + str(raft_port)
+    return http_addr, raft_addr
+
+
+# generate raft address from peer address
+def generate_raft_addr(peer_addr):
+    print('generate peer addr for: ' + peer_addr)
+    ip = peer_addr.split(":")[0]
+    port = peer_addr.split(":")[1]
+    http_port = str(int(port) + 100)  # raft http port is (100 + peer port)
+    raft_port = str(int(port) + 101)  # raft port is (101 + peer port)
+    return {'httpAddr': ip + ':' + http_port, 'raftAddr': ip + ':' + raft_port}
+
+
+def disturb_w(w):
+    disturbed_w = copy.deepcopy(w)
+    for name, param in w.items():
+        beta = random.random()
+        transformed_w = param * beta
+        disturbed_w[name] = transformed_w
+    return disturbed_w
+
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -630,9 +648,11 @@ def conver_json_value_to_tensor(data):
         data[key] = torch.from_numpy(np.array(value))
 
 
-def convert_tensor_value_to_numpy(data):
-    for key, value in data.items():
-        data[key] = value.cpu().numpy()
+def convert_tensor_value_to_numpy(tensor_data):
+    numpy_data = copy.deepcopy(tensor_data)
+    for key, value in numpy_data.items():
+        numpy_data[key] = value.cpu().numpy()
+    return numpy_data
 
 
 # compress object to base64 string
@@ -652,10 +672,9 @@ def decompress_data(data):
 
 
 # generate md5 hash for global model
-def generate_md5_hash(model):
-    w_model = model.state_dict()
-    convert_tensor_value_to_numpy(w_model)
-    data_md5 = hashlib.md5(json.dumps(w_model, sort_keys=True, cls=NumpyEncoder).encode('utf-8')).hexdigest()
+def generate_md5_hash(model_weights):
+    np_model_weights = convert_tensor_value_to_numpy(model_weights)
+    data_md5 = hashlib.md5(json.dumps(np_model_weights, sort_keys=True, cls=NumpyEncoder).encode('utf-8')).hexdigest()
     return data_md5
 
 
@@ -685,12 +704,6 @@ class MainHandler(web.RequestHandler):
             asyncio.ensure_future(start())
         elif message == "prepare":
             asyncio.ensure_future(prepare(data.get("data"), data.get("uuid"), data.get("epochs")))
-        elif message == "prepare":
-            asyncio.ensure_future(train(data.get("data"), data.get("uuid"), data.get("epochs"), time.time()))
-        elif message == "security_poll":
-            asyncio.ensure_future(security_poll(data.get("data"), data.get("uuid"), data.get("epochs")))
-        elif message == "alpha":
-            asyncio.ensure_future(round_finish(data.get("data"), data.get("uuid"), data.get("epochs")))
         return
 
 

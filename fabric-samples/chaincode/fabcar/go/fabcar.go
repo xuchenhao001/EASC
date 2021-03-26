@@ -53,7 +53,9 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 	return nil
 }
 
-// STEP #2
+// STEP #1
+// (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
+// to the ledger.
 func (s *SmartContract) Start(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
 	fmt.Println("[START MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
@@ -73,6 +75,11 @@ func (s *SmartContract) Start(ctx contractapi.TransactionContextInterface, recei
 	}
 	userNum = int(dataMap["user_number"].(float64))
 	fmt.Println("Successfully loaded user number: ", userNum)
+	// store initial global model hash into the ledger
+	err = saveAsMap(ctx, "modelMap", recMsg.Epochs, "", recMsg.Data)
+	if err != nil {
+		return fmt.Errorf("failed to save model hash into state. %s", err.Error())
+	}
 
 	recMsg.Uuid = myuuid
 	recMsg.Message = "prepare"
@@ -84,6 +91,8 @@ func (s *SmartContract) Start(ctx contractapi.TransactionContextInterface, recei
 }
 
 // STEP #2
+// BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
+// send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
 func (s *SmartContract) RaftInfo(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
 	fmt.Println("[RAFT INFO MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
@@ -98,70 +107,19 @@ func (s *SmartContract) RaftInfo(ctx contractapi.TransactionContextInterface, re
 	return nil
 }
 
-func saveAsMap(ctx contractapi.TransactionContextInterface, keyType string, epochs int, myUUID string,
-	value interface{}) error {
-	epochsString := strconv.Itoa(epochs)
-	fmt.Println("save [" + keyType + "] map to DB in epoch [" + epochsString  + "] for uuid: [" + myUUID + "]")
-
-	key, err := ctx.GetStub().CreateCompositeKey(keyType, []string{epochsString, myUUID})
-	if err !=nil {
-		return fmt.Errorf("failed to composite key: %s", err.Error())
-	}
-
-	jsonAsBytes, _ := json.Marshal(value)
-	err = ctx.GetStub().PutState(key, jsonAsBytes)
-	if err != nil {
-		return fmt.Errorf("failed to save map into state: %s", err.Error())
-	}
-	return nil
-}
-
-func readAsMap(ctx contractapi.TransactionContextInterface,
-	keyType string, epochs int) (map[string]interface{}, error) {
-
-	epochsString := strconv.Itoa(epochs)
-	fmt.Println("read [" + keyType + "] map from DB in epoch [" + epochsString  + "]")
-
-	mapIter, err := ctx.GetStub().GetStateByPartialCompositeKey(keyType, []string{epochsString})
-	if err != nil {
-		return nil, fmt.Errorf("failed to read map from state by partial composite key: %s", err.Error())
-	}
-	defer mapIter.Close()
-
-	resultMap := make(map[string]interface{})
-
-	for mapIter.HasNext() {
-		mapItem, err := mapIter.Next()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read next map item from state: %s", err.Error())
-		}
-
-		var compositeKeyAttri []string
-		_, compositeKeyAttri, err = ctx.GetStub().SplitCompositeKey(mapItem.Key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to split composite key: %s", err.Error())
-		}
-		var myUUID string
-		myUUID = compositeKeyAttri[1]
-		valueMap := make(map[string]interface{})
-		_ = json.Unmarshal(mapItem.Value, &valueMap)
-		resultMap[myUUID] = valueMap
-	}
-
-	return resultMap, nil
-}
-
-// STEP #4
+// STEP #3
+// BC-nodes-python train local model based on previous round's local model, send local model to the committee leader,
+// send hash of local model to the ledger.
 func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
 	fmt.Println("[TRAIN MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
-	// store w map into blockchain
-	err := saveAsMap(ctx, "wMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	// store local trained model hash into the ledger
+	err := saveAsMap(ctx, "modelMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
-		return fmt.Errorf("failed to update w map into state. %s", err.Error())
+		return fmt.Errorf("failed to save model hash into state. %s", err.Error())
 	}
 
 	return nil
@@ -463,6 +421,60 @@ func findMinAccVar(accAlphaMap map[string]AccAlpha) float64 {
 	alpha := accAlphaMap[randomUuid].Alpha[minIndex]
 	fmt.Println("Found the min acc_test variance: ", min, " with alpha: ", alpha)
 	return alpha
+}
+
+
+func saveAsMap(ctx contractapi.TransactionContextInterface, keyType string, epochs int, myUUID string,
+	value interface{}) error {
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("save [" + keyType + "] map to DB in epoch [" + epochsString  + "] for uuid: [" + myUUID + "]")
+
+	key, err := ctx.GetStub().CreateCompositeKey(keyType, []string{epochsString, myUUID})
+	if err !=nil {
+		return fmt.Errorf("failed to composite key: %s", err.Error())
+	}
+
+	jsonAsBytes, _ := json.Marshal(value)
+	err = ctx.GetStub().PutState(key, jsonAsBytes)
+	if err != nil {
+		return fmt.Errorf("failed to save map into state: %s", err.Error())
+	}
+	return nil
+}
+
+func readAsMap(ctx contractapi.TransactionContextInterface,
+	keyType string, epochs int) (map[string]interface{}, error) {
+
+	epochsString := strconv.Itoa(epochs)
+	fmt.Println("read [" + keyType + "] map from DB in epoch [" + epochsString  + "]")
+
+	mapIter, err := ctx.GetStub().GetStateByPartialCompositeKey(keyType, []string{epochsString})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read map from state by partial composite key: %s", err.Error())
+	}
+	defer mapIter.Close()
+
+	resultMap := make(map[string]interface{})
+
+	for mapIter.HasNext() {
+		mapItem, err := mapIter.Next()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read next map item from state: %s", err.Error())
+		}
+
+		var compositeKeyAttri []string
+		_, compositeKeyAttri, err = ctx.GetStub().SplitCompositeKey(mapItem.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to split composite key: %s", err.Error())
+		}
+		var myUUID string
+		myUUID = compositeKeyAttri[1]
+		valueMap := make(map[string]interface{})
+		_ = json.Unmarshal(mapItem.Value, &valueMap)
+		resultMap[myUUID] = valueMap
+	}
+
+	return resultMap, nil
 }
 
 func sendPostRequest(buf []byte, requestType string) {
