@@ -117,30 +117,32 @@ func (s *SmartContract) Train(ctx contractapi.TransactionContextInterface, recei
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
 	// store local trained model hash into the ledger
-	err := saveAsMap(ctx, "modelMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
+	err := saveAsMap(ctx, "localModelHashMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
-		return fmt.Errorf("failed to save model hash into state. %s", err.Error())
+		return fmt.Errorf("failed to save local model hash into state. %s", err.Error())
 	}
 
 	return nil
 }
 
-func (s *SmartContract) CheckTrainRead(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
-	fmt.Println("[CHECK TRAIN READ MSG] Received")
+// STEP #4
+// committee leader received all local models, aggregate to global model, then send the download link of global model
+// and the hash of global model to the ledger.
+func (s *SmartContract) GlobalModelUpdate(ctx contractapi.TransactionContextInterface, receiveMsg string) error {
+	fmt.Println("[GLOBAL MODEL UPDATE MSG] Received")
 	receiveMsgBytes := []byte(receiveMsg)
 	recMsg := new(HttpMessage)
 	_ = json.Unmarshal(receiveMsgBytes, recMsg)
 
-	// try to read wMap, if all good, then can go on "train ready".
-	wMap, err := readAsMap(ctx, "wMap", recMsg.Epochs)
+	// store global model hash into the ledger
+	err := saveAsMap(ctx, "globalModelHashMap", recMsg.Epochs, recMsg.Uuid, recMsg.Data)
 	if err != nil {
-		return fmt.Errorf("failed to read w map from state. %s", err.Error())
+		return fmt.Errorf("failed to save global model hash into state. %s", err.Error())
 	}
-	if len(wMap) == userNum {
-		fmt.Println("gathered enough w map [" + strconv.Itoa(len(wMap)) + "], can go on to train ready now.")
-	} else {
-		fmt.Println("not gathered enough w map [" + strconv.Itoa(len(wMap)) + "], do nothing.")
-	}
+
+	// TODO: trigger STEP #5
+	// let each node download the newest global model
+
 	return nil
 }
 

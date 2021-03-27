@@ -52,9 +52,6 @@ type Service struct {
 	ln   net.Listener
 
 	store Store
-
-	// for the storage of federated learning models
-	flKVStore map[string]string
 }
 
 // New returns an uninitialized HTTP service.
@@ -63,7 +60,6 @@ func New(addr string, nodeId string, store Store) *Service {
 		addr:  addr,
 		store: store,
 		nodeId: nodeId,
-		flKVStore: make(map[string]string),
 	}
 }
 
@@ -113,8 +109,6 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleShutdown(w, r)
 	} else if r.URL.Path == "/kill" {
 		s.handleKill(w, r)
-	} else if r.URL.Path == "/modelstore" {
-		s.handleModelStore(w, r)
 	} else {
 		log.Printf("Error: unknown URL path: " + r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
@@ -258,40 +252,6 @@ func (s *Service) handleKill(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		os.Exit(0)
 	}()
-}
-
-// store local model or global models
-func (s *Service) handleModelStore(w http.ResponseWriter, r *http.Request) {
-	// Read the value from the POST body.
-	m := map[string]string{}
-	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		log.Printf("Failed to decode request body: " + err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	uuid := m["uuid"]
-	epochs := m["epochs"]
-	key := "uuid-" + uuid + "-epochs-" + epochs
-	
-	if m["message"] == "set" {
-		wCompressed := m["w_compressed"]
-		s.flKVStore[key] = wCompressed
-		log.Printf("Stored model to: %s, len: %d", key, len(wCompressed))
-		w.WriteHeader(http.StatusAccepted)
-		return
-	} else if m["message"] == "get" {
-		wCompressed := s.flKVStore[key]
-		log.Printf("Queried model from: %s, len: %d", key, len(wCompressed))
-		b, err := json.Marshal(map[string]string{"w_compressed": wCompressed})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
-		return
-	}
 }
 
 

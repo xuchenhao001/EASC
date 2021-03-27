@@ -45,6 +45,8 @@ hyperpara_max = 0.8
 negotiate_round = 10
 # committee members proportion
 committee_proportion = 0.3
+# federated learning server listen port
+fed_listen_port = 8888
 # TO BE CHANGED FINISHED
 
 # NOT TO TOUCH VARIABLES BELOW
@@ -75,6 +77,8 @@ next_round_count_num = 0
 g_start_time = {}
 g_train_time = {}
 g_test_time = {}
+g_train_local_models = {}
+g_train_global_models = {}
 ip_map = {}
 peer_address_list = []
 shutdown_raft = ""
@@ -155,7 +159,7 @@ def init():
     peer_address_list = peerAddressVar.split(' ')
     peerHeaderAddr = peer_address_list[0].split(":")[0]
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
-    trigger_url = "http://" + peerHeaderAddr + ":8888/trigger"
+    trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
 
     # parse args
     args = args_parser()
@@ -255,6 +259,7 @@ async def prepare(data, uuid, epochs):
     await gen.sleep(2)
     # all nodes need to store the committee leader info for later local model upload
     raft_leader_http_addr, raft_leader_raft_addr = generate_raft_addr_info(committee_leader_id)
+    raft_leader_http_addr = raft_leader_http_addr.split(":")[0] + ":" + str(fed_listen_port)
 
     # if this node is elected as committee leader, boot the raft network.
     if int(uuid) == committee_leader_id:
@@ -314,9 +319,8 @@ async def prepare(data, uuid, epochs):
 # Federated Learning: train step
 async def train(w_glob_compressed, uuid, epochs, start_time):
     print('train data now for user: ' + uuid)
-    decompressed_w_glob = decompress_data(w_glob_compressed)
-    conver_json_value_to_tensor(decompressed_w_glob)
-    net_glob.load_state_dict(decompressed_w_glob)
+    w_glob = conver_json_value_to_tensor(decompress_data(w_glob_compressed))
+    net_glob.load_state_dict(w_glob)
 
     idx = int(uuid) - 1
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
@@ -330,12 +334,14 @@ async def train(w_glob_compressed, uuid, epochs, start_time):
     # send local model to the committee leader
     w_compressed = compress_data(convert_tensor_value_to_numpy(w))
     body_data = {
-        'message': 'set',
+        'message': 'train_ready',
         'uuid': str(uuid),
         'epochs': str(epochs),
         'w_compressed': w_compressed,
+        'start_time': start_time,
+        'train_time': train_time
     }
-    await http_client_post("http://" + raft_leader_http_addr + "/modelstore", body_data)
+    await http_client_post("http://" + raft_leader_http_addr + "/trigger", body_data)
 
     # send hash of local model to the ledger
     model_md5 = generate_md5_hash(w)
@@ -358,9 +364,7 @@ async def security_poll(w_compressed_map, uuid, epochs):
     # calculate loss mean and std
     for w_uuid in w_compressed_map.keys():
         w = w_compressed_map[w_uuid].get("w")
-        decompressed_w = decompress_data(w)
-        conver_json_value_to_tensor(decompressed_w)
-        w_map[w_uuid] = decompressed_w
+        w_map[w_uuid] = conver_json_value_to_tensor(decompress_data(w))
     # test the loss of weight on myself dataset
     idx = int(uuid) - 1
     loss_map = {}
@@ -502,16 +506,14 @@ async def round_finish(data, uuid, epochs):
     accuracy = data.get("accuracy")
     w_map = data.get("wMap")
     w_glob_map = data.get("wGlobMap")
-    w_local = w_map[uuid].get("w")
-    w_glob = w_glob_map[uuid].get("w_glob")
-    decompressed_w_local = decompress_data(w_local)
-    conver_json_value_to_tensor(decompressed_w_local)
-    decompressed_w_glob = decompress_data(w_glob)
-    conver_json_value_to_tensor(decompressed_w_glob)
+    compressed_w_local = w_map[uuid].get("w")
+    compressed_w_glob = w_glob_map[uuid].get("w_glob")
+    w_local = conver_json_value_to_tensor(decompress_data(compressed_w_local))
+    w_glob = conver_json_value_to_tensor(decompress_data(compressed_w_glob))
     # calculate new w_glob (w_local2) according to the alpha
     w_local2 = {}
-    for key in decompressed_w_glob.keys():
-        w_local2[key] = alpha * decompressed_w_local[key] + (1 - alpha) * decompressed_w_glob[key]
+    for key in w_glob.keys():
+        w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
 
     # start next round! Go to STEP #3
     compressed_w_local2 = compress_data(convert_tensor_value_to_numpy(w_local2))
@@ -643,9 +645,11 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def conver_json_value_to_tensor(data):
-    for key, value in data.items():
-        data[key] = torch.from_numpy(np.array(value))
+def conver_json_value_to_tensor(numpy_data):
+    tensor_data = copy.deepcopy(numpy_data)
+    for key, value in tensor_data.items():
+        tensor_data[key] = torch.from_numpy(np.array(value))
+    return tensor_data
 
 
 def convert_tensor_value_to_numpy(tensor_data):
@@ -671,7 +675,7 @@ def decompress_data(data):
     return json.loads(decompressed)
 
 
-# generate md5 hash for global model
+# generate md5 hash for global model. Require a tensor type gradients.
 def generate_md5_hash(model_weights):
     np_model_weights = convert_tensor_value_to_numpy(model_weights)
     data_md5 = hashlib.md5(json.dumps(np_model_weights, sort_keys=True, cls=NumpyEncoder).encode('utf-8')).hexdigest()
@@ -707,36 +711,52 @@ class MainHandler(web.RequestHandler):
         return
 
 
-async def train_count(epochs, uuid, start_time, train_time):
+# STEP #4
+# committee leader received all local models, aggregate to global model, then send the download link of global model
+# and the hash of global model to the ledger.
+async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     lock.acquire()
     global train_count_num
     global g_start_time
     global g_train_time
+    global g_train_local_models
     train_count_num += 1
     print("Received a train_ready, now: " + str(train_count_num))
     key = str(uuid) + "-" + str(epochs)
     g_start_time[key] = start_time
     g_train_time[key] = train_time
+    # append newly arrived w_local (decompressed) into g_train_local_models list for further aggregation
+    if epochs not in g_train_local_models:
+        g_train_local_models[epochs] = []
+    g_train_local_models[epochs].append(conver_json_value_to_tensor(decompress_data(w_compressed)))
     lock.release()
     if train_count_num == args.num_users:
-        print("Gathered enough train_ready, send to blockchain server. now: " + str(train_count_num))
-        # check train read first, since network delay may cause blockchain dirty read.
-        while True:
-            trigger_data = {
-                'message': 'check_train_read',
-                'epochs': epochs,
-            }
-            response = await http_client_post(blockchain_server_url, trigger_data)
-            if response is not None:
-                break
-            await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
-
-        # trigger train_ready
-        trigger_data = {
-            'message': 'train_ready',
+        print("Gathered enough train_ready, aggregate global model and send the download link.")
+        # aggregate global model first
+        w_glob = FedAvg(g_train_local_models[epochs])
+        # save global model for further download (compressed)
+        w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
+        g_train_local_models[epochs] = w_glob_compressed
+        # generate hash of global model
+        global_model_hash = generate_md5_hash(w_glob)
+        # send the download link and hash of global model to the ledger
+        body_data = {
+            'message': 'GlobalModelUpdate',
+            'data': {
+                'global_model_hash': global_model_hash,
+            },
+            'uuid': uuid,
             'epochs': epochs,
         }
-        await http_client_post(blockchain_server_url, trigger_data)
+        print('aggregate global model finished, send global_model_hash [%s] to blockchain.' % global_model_hash)
+        await http_client_post(blockchain_server_url, body_data)
+
+
+async def download_global_model(epochs):
+    detail = {
+        "global_model": g_train_local_models[epochs],
+    }
+    return detail
 
 
 # This is a blocking process until blockchain returns poll results
@@ -827,7 +847,7 @@ async def next_round_count(data, epochs, uuid, from_ip):
                 'epochs': epochs - 1,
                 'data': data,
             }
-            my_url = "http://" + ip_map[user_id] + ":8888/trigger"
+            my_url = "http://" + ip_map[user_id] + ":" + str(fed_listen_port) + "/trigger"
             asyncio.ensure_future(http_client_post(my_url, trigger_data))
 
 
@@ -854,7 +874,11 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"))
+            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"),
+                              data.get("w_compressed"))
+        if message == "global_model":
+            detail = await download_global_model(data.get("epochs"))
+            # done here
         if message == "outlier_record_ready":
             detail = await poll_count(data.get("epochs"), data.get("uuid"))
         elif message == "negotiate_ready":
@@ -895,6 +919,6 @@ def make_app():
 if __name__ == "__main__":
     init()
     app = make_app()
-    app.listen(8888)
-    print("start serving at 8888...")
+    app.listen(fed_listen_port)
+    print("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()
