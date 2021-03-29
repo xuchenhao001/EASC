@@ -54,15 +54,13 @@ blockchain_server_url = ""
 trigger_url = ""
 # blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
 # trigger_url = "http://localhost:8888/trigger"
-total_epochs = 0
+total_epochs = 0  # epochs must be an integer
 args = None
 net_glob = None
 dataset_train = None
 dataset_test = None
 dict_users = None
 idxs_users = None
-check_train_ready_map = {}
-check_negotiate_ready_map = {}
 lock = threading.Lock()
 train_users = None
 test_users = None
@@ -70,19 +68,22 @@ skew_users1 = None
 skew_users2 = None
 skew_users3 = None
 skew_users4 = None
-train_count_num = 0
 poll_count_num = 0
 negotiate_count_num = 0
 next_round_count_num = 0
+peer_address_list = []
+shutdown_raft = {}
+raft_leader_http_addr = ""
+my_local_model_tensor = {}
+my_global_model_tensor = {}
+global_model_hash = ""
+# Global parameters for the committee leader
+train_count_num = 0
 g_start_time = {}
 g_train_time = {}
-g_test_time = {}
 g_train_local_models = {}
 g_train_global_models = {}
-ip_map = {}
-peer_address_list = []
-shutdown_raft = ""
-raft_leader_http_addr = ""
+g_test_time = {}
 
 
 ######## Federated Learning process ########
@@ -96,10 +97,10 @@ raft_leader_http_addr = ""
 # 4. committee leader received all local models, aggregate to global model, then send the download link of global model
 #    and the hash of global model to the ledger.
 # 5. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
-#    alpha-accuracy map, which will be uploaded to the committee leader.
-# 6. committee leader received alpha-accuracy map, send to the ledger
-# 7. after gathering all alpha-accuracy maps, pick up the appropriate alpha according to the rule, save to the ledger.
-# 8. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
+#    alpha-accuracy map, which will be uploaded to the ledger.
+# 6. Smart Contract pick up the appropriate alpha according to the rule after gathering all alpha-accuracy maps, save
+#    to the ledger.
+# 7. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
 #    new local model. Test the new local model, then repeat from step 2.
 
 
@@ -128,10 +129,10 @@ async def http_client_post(url, body_data):
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
-        print("[HTTP Success] [" + body_data['message'] + "] from " + url + " SERVICE RESPONSE: %s" % response.body)
+        print("[HTTP Success] [" + body_data['message'] + "] from " + url)
         return response.body
     except Exception as e:
-        print("[HTTP Error] [" + body_data['message'] + "] from " + url + " SERVICE RESPONSE: %s" % e)
+        print("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
         return None
 
 
@@ -223,16 +224,18 @@ def init():
 # (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
 # to the ledger.
 async def start():
+    global global_model_hash
     print("####################\nEpoch #", total_epochs, " start now\n####################")
     # generate md5 hash from model, which is treated as global model of previous round.
     w = net_glob.state_dict()
-    model_md5 = generate_md5_hash(w)
+    global_model_hash = generate_md5_hash(w)
     # upload md5 hash to ledger
     body_data = {
         'message': 'Start',
         'data': {
-            'model_hash': model_md5,
+            'global_model_hash': global_model_hash,
             'user_number': args.num_users,
+            'do_elect': True
         },
         'epochs': total_epochs
     }
@@ -242,109 +245,106 @@ async def start():
 # STEP #2
 # BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
 # send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
-async def prepare(data, uuid, epochs):
+async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
     global shutdown_raft
-    print('Received boot strap request for user: ' + uuid)
-    md5hash = data.get("model_hash")
-    committee_leader_id = int(md5hash, 16) % args.num_users + 1
-    committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
-    committee_highest_id = committee_proportion_num + committee_leader_id - 1
-    # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
-    if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
-        print("# BOOT LOCAL RAFT PROCESS! #")
-        http_addr, raft_addr = generate_raft_addr_info(uuid)
-        boot_local_raft_proc(uuid, http_addr, raft_addr)
-    # wait for a while in case raft processes on some nodes are not running.
-    await gen.sleep(2)
-    # all nodes need to store the committee leader info for later local model upload
-    raft_leader_http_addr, raft_leader_raft_addr = generate_raft_addr_info(committee_leader_id)
-    raft_leader_http_addr = raft_leader_http_addr.split(":")[0] + ":" + str(fed_listen_port)
+    print('Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
+    # if need, re-elect the committee members
+    if do_elect:
+        print('Received elect request! Elect new committee members!')
+        committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
+        committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
+        committee_highest_id = committee_proportion_num + committee_leader_id - 1
+        # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
+        if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
+            print("# BOOT LOCAL RAFT PROCESS! #")
+            http_addr, raft_addr = generate_raft_addr_info(uuid)
+            boot_local_raft_proc(uuid, http_addr, raft_addr)
+        # wait for a while in case raft processes on some nodes are not running.
+        await gen.sleep(2)
+        # all nodes need to store the committee leader info for later local model upload
+        raft_leader_http_addr, raft_leader_raft_addr = generate_raft_addr_info(committee_leader_id)
 
-    # if this node is elected as committee leader, boot the raft network.
-    if int(uuid) == committee_leader_id:
-        print("Find out the leader ID: " + uuid)
-        print("# BOOT RAFT CONSENSUS NETWORK! #")
-        leader_http_addr, leader_raft_addr = generate_raft_addr_info(uuid)
+        # if this node is elected as committee leader, boot the raft network.
+        if int(uuid) == committee_leader_id:
+            print("Find out the leader ID: " + uuid)
+            print("# BOOT RAFT CONSENSUS NETWORK! #")
+            client_addrs = []
+            client_raft_addrs = []
+            client_ids = []
+            # i starts from the leader id and end at committee highest id
+            print("committee_highest_id: " + str(committee_highest_id))
+            for i in range(int(uuid) + 1, committee_highest_id + 1):
+                if i > args.num_users:
+                    index = i % args.num_users
+                else:
+                    index = i
+                client_http_addr, client_raft_addr = generate_raft_addr_info(index)
+                client_ids.append(str(index))
+                client_addrs.append(client_http_addr)
+                client_raft_addrs.append(client_raft_addr)
+            body_data = {
+                'message': 'raft_start',
+                'leaderAddr': raft_leader_http_addr,
+                'leaderRaftAddr': raft_leader_raft_addr,
+                'leaderId': str(uuid),
+                'clientAddrs': client_addrs,
+                'clientRaftAddrs': client_raft_addrs,
+                'clientIds': client_ids,
+            }
+            # update shutdown request
+            shutdown_raft = body_data
+            shutdown_raft['message'] = 'raft_shutdown'
+            await http_client_post("http://" + raft_leader_http_addr + "/setup", body_data)
 
-        client_addrs = []
-        client_raft_addrs = []
-        client_ids = []
-        # i starts from the leader id and end at committee highest id
-        print("committee_highest_id: " + str(committee_highest_id))
-        for i in range(int(uuid) + 1, committee_highest_id + 1):
-            index = 0
-            if i > args.num_users:
-                index = i % args.num_users
-            else:
-                index = i
-            client_http_addr, client_raft_addr = generate_raft_addr_info(index)
-            client_ids.append(str(index))
-            client_addrs.append(client_http_addr)
-            client_raft_addrs.append(client_raft_addr)
-        body_data = {
-            'message': 'raft_start',
-            'leaderAddr': leader_http_addr,
-            'leaderRaftAddr': leader_raft_addr,
-            'leaderId': str(uuid),
-            'clientAddrs': client_addrs,
-            'clientRaftAddrs': client_raft_addrs,
-            'clientIds': client_ids,
-        }
-        shutdown_raft = body_data
-        await http_client_post("http://" + leader_http_addr + "/setup", body_data)
+            # finally send raft network info to the ledger
+            body_data = {
+                'message': 'RaftInfo',
+                'data': {
+                    'leader_addr': raft_leader_http_addr,
+                },
+                'uuid': uuid,
+                'epochs': epochs,
+            }
+            await http_client_post(blockchain_server_url, body_data)
+        else:
+            await gen.sleep(5)
 
-        # finally send raft network info to the ledger
-        body_data = {
-            'message': 'RaftInfo',
-            'data': {
-                'leader_addr': leader_http_addr,
-            },
-            'uuid': uuid,
-            'epochs': epochs,
-        }
-        await http_client_post(blockchain_server_url, body_data)
-    else:
-        await gen.sleep(5)
-
-    # then go ahead to STEP #3, train the local model
-    # copy weights
-    w_glob = net_glob.state_dict()  # change model to parameters
-    # upload w_glob onto blockchian
-    w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
-    await train(w_glob_compressed, uuid, epochs, time.time())
+    # finally go ahead to STEP #3, train the local model
+    await train(uuid, epochs, time.time())
 
 
 # STEP #3
 # Federated Learning: train step
-async def train(w_glob_compressed, uuid, epochs, start_time):
-    print('train data now for user: ' + uuid)
-    w_glob = conver_json_value_to_tensor(decompress_data(w_glob_compressed))
-    net_glob.load_state_dict(w_glob)
+async def train(uuid, epochs, start_time):
+    global my_local_model_tensor
+    print('Train local model for user: %s, epoch: %s.' % (uuid, epochs))
 
     idx = int(uuid) - 1
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
     train_start_time = time.time()
-    w, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+    w_local, loss = local.train(net=copy.deepcopy(net_glob).to(args.device))
+    # update local cached local model for this epoch
+    my_local_model_tensor = w_local
     # fake attackers
     if uuid in attackers_id:
-        w = disturb_w(w)
+        w_local = disturb_w(w_local)
     train_time = time.time() - train_start_time
 
     # send local model to the committee leader
-    w_compressed = compress_data(convert_tensor_value_to_numpy(w))
+    w_local_compressed = compress_data(convert_tensor_value_to_numpy(w_local))
     body_data = {
         'message': 'train_ready',
         'uuid': str(uuid),
-        'epochs': str(epochs),
-        'w_compressed': w_compressed,
+        'epochs': epochs,
+        'w_compressed': w_local_compressed,
         'start_time': start_time,
         'train_time': train_time
     }
-    await http_client_post("http://" + raft_leader_http_addr + "/trigger", body_data)
+    await http_client_post(trigger_url, body_data)
 
     # send hash of local model to the ledger
-    model_md5 = generate_md5_hash(w)
+    model_md5 = generate_md5_hash(w_local)
     body_data = {
         'message': 'Train',
         'data': {
@@ -356,106 +356,69 @@ async def train(w_glob_compressed, uuid, epochs, start_time):
     await http_client_post(blockchain_server_url, body_data)
 
 
-# STEP #4.1
-# Security poll
-async def security_poll(w_compressed_map, uuid, epochs):
-    print('received security poll request.')
-    w_map = {}
-    # calculate loss mean and std
-    for w_uuid in w_compressed_map.keys():
-        w = w_compressed_map[w_uuid].get("w")
-        w_map[w_uuid] = conver_json_value_to_tensor(decompress_data(w))
-    # test the loss of weight on myself dataset
-    idx = int(uuid) - 1
-    loss_map = {}
-    cross_test_start_time = time.time()
-    for w_uuid in w_map.keys():
-        net_glob.load_state_dict(w_map[w_uuid])
-        net_glob.eval()
-        acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
-        loss_map[w_uuid] = loss_test
-        print("Cross test for user " + str(w_uuid) + " result: " + str(loss_test))
-    cross_test_time = time.time() - cross_test_start_time
-    loss_mean = statistics.mean(list(loss_map.values()))
-    loss_std = statistics.stdev(list(loss_map.values()))
-    outlier_line = 2 * loss_std + loss_mean
-    print("Outlier line for epoch [" + str(epochs) + "] is: " + str(outlier_line))
-    # just for local test
-    # outlier_line = 0.6
-    # find out outlier loss value
-    outlier_uuid = []
-    for w_uuid in loss_map.keys():
-        if loss_map[w_uuid] > outlier_line:
-            print("!!! Found attacker: " + w_uuid + " with loss: " + str(loss_map[w_uuid]))
-            outlier_uuid.append(int(w_uuid))
+# STEP #4
+# committee leader received all local models, aggregate to global model, then send the download link of global model
+# and the hash of global model to the ledger.
+async def train_count(epochs, uuid, start_time, train_time, w_compressed):
+    lock.acquire()
+    global train_count_num
+    global g_start_time
+    global g_train_time
+    global g_train_local_models
+    global global_model_hash
+    train_count_num += 1
+    print("Received a train_ready, now: " + str(train_count_num))
+    key = str(uuid) + "-" + str(epochs)
+    g_start_time[key] = start_time
+    g_train_time[key] = train_time
+    # append newly arrived w_local (decompressed) into g_train_local_models list for further aggregation
+    if epochs not in g_train_local_models:
+        g_train_local_models[epochs] = []
+    g_train_local_models[epochs].append(conver_numpy_value_to_tensor(decompress_data(w_compressed)))
+    lock.release()
+    if train_count_num == args.num_users:
+        print("Gathered enough train_ready, aggregate global model and send the download link.")
+        # aggregate global model first
+        w_glob = FedAvg(g_train_local_models[epochs])
+        # save global model for further download (compressed)
+        w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
+        g_train_global_models[epochs] = w_glob_compressed
+        # generate hash of global model
+        global_model_hash = generate_md5_hash(w_glob)
+        # send the download link and hash of global model to the ledger
+        body_data = {
+            'message': 'GlobalModelUpdate',
+            'data': {
+                'global_model_hash': global_model_hash,
+            },
+            'uuid': uuid,
+            'epochs': epochs,
+        }
+        print('aggregate global model finished, send global_model_hash [%s] to blockchain in epoch [%s].'
+              % (global_model_hash, epochs))
+        await http_client_post(blockchain_server_url, body_data)
+
+
+# 5. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
+#    alpha-accuracy map, which will be uploaded to the committee leader.
+async def calculate_acc_alpha(uuid, epochs):
+    global my_global_model_tensor
+    print('Start calculate accuracy and alpha for user: %s, epoch: %s.' % (uuid, epochs))
+    # download global model
     body_data = {
-        'message': 'outlier_record',
-        'data': {
-            'outlier_ids': outlier_uuid,
-        },
-        'uuid': uuid,
+        'message': 'global_model',
         'epochs': epochs,
     }
-    await http_client_post(blockchain_server_url, body_data)
-    trigger_data = {
-        'message': 'outlier_record_ready',
-        'epochs': epochs,
-        'uuid': uuid,
-    }
-    response = await http_client_post(trigger_url, trigger_data)
-    # first decode from blockchain server, then decode from smart contract
-    responseObj = json.loads(response)
-    sc_responseObj = json.loads(responseObj.get("detail"))
-    outlier_list = sc_responseObj.get("detail")
-    print("Get outlier_list: " + ', '.join(str(e) for e in outlier_list))
+    print('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
+    result = await http_client_post(trigger_url, body_data)
+    responseObj = json.loads(result)
+    detail = responseObj.get("detail")
+    global_model_compressed = detail.get("global_model")
+    w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+    # update local cached global model for this epoch
+    my_global_model_tensor = w_glob
 
-    # STEP 4.2 average w, generate new global_w
-    wArray = []
-    for w_uuid in w_map.keys():
-        # filter outliers
-        if int(w_uuid) not in outlier_list:
-            wArray.append(w_map[w_uuid])
-    w_glob = FedAvg(wArray)
-    w_local = w_map[uuid]
-
-    # upload w_glob to blockchain here
-    np_w_glob = convert_tensor_value_to_numpy(w_glob)
-    w_glob_compressed = compress_data(np_w_glob)
-    body_data = {
-        'message': 'w_glob',
-        'data': {
-            'w_glob': w_glob_compressed,
-        },
-        'uuid': uuid,
-        'epochs': epochs,
-    }
-    await http_client_post(blockchain_server_url, body_data)
-    # start new thread for step #5
-    thread_negotiate = myNegotiateThread(uuid, np_w_glob, w_local, epochs, cross_test_time)
-    thread_negotiate.start()
-
-
-# STEP #5
-# Federated Learning: negotiate and test accuracy, upload to blockchain
-class myNegotiateThread(Thread):
-    def __init__(self, my_uuid, w_glob, w_local, epochs, cross_test_time):
-        Thread.__init__(self)
-        self.my_uuid = my_uuid
-        self.w_glob = w_glob
-        self.w_local = w_local
-        self.epochs = epochs
-        self.cross_test_time = cross_test_time
-
-    def run(self):
-        print("start my negotiate thread: " + self.my_uuid)
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(negotiate(self.my_uuid, self.w_glob, self.w_local, self.epochs, self.cross_test_time))
-        print("end my negotiate thread: " + self.my_uuid)
-
-
-async def negotiate(my_uuid, w_glob, w_local, epochs, cross_test_time):
-    print("start negotiate for user: " + my_uuid)
-
+    # test different alpha
     negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
     negotiate_step_list = np.arange(hyperpara_min, hyperpara_max, negotiate_step)
     alpha_list = []
@@ -464,62 +427,77 @@ async def negotiate(my_uuid, w_glob, w_local, epochs, cross_test_time):
     for alpha in negotiate_step_list:
         w_local2 = {}
         for key in w_glob.keys():
-            w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
+            w_local2[key] = alpha * my_local_model_tensor[key] + (1 - alpha) * w_glob[key]
 
         # change parameters to model
         net_glob.load_state_dict(w_local2)
         net_glob.eval()
         # test the accuracy
-        idx = int(my_uuid) - 1
+        idx = int(uuid) - 1
         acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
         alpha_list.append(alpha)
         acc_test_list.append(acc_test.numpy().item(0))
-        print("myuuid: " + my_uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
-
+        print("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
     test_time = time.time() - test_start_time
-    # send acc_test_list and alpha_list to smart contract
+
+    # upload acc-alpha map to committee leader and the ledger
     body_data = {
-        'message': 'negotiate',
+        'message': 'AccAlphaMap',
         'data': {
             'acc_test': acc_test_list,
             'alpha': alpha_list,
         },
-        'uuid': my_uuid,
+        'uuid': uuid,
         'epochs': epochs,
     }
-    print('negotiate finished, send acc_test and alpha to blockchain for uuid: ' + my_uuid)
+    print('negotiate finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
     await http_client_post(blockchain_server_url, body_data)
     trigger_data = {
-        'message': 'negotiate_ready',
+        'message': 'acc_alpha_map_ready',
         'epochs': epochs,
-        'uuid': my_uuid,
-        'test_time': test_time + cross_test_time,
+        'uuid': uuid,
+        'test_time': test_time,
     }
     await http_client_post(trigger_url, trigger_data)
+
+
+# count for STEP #5 the acc alpha map gathered
+async def acc_alpha_map_count(epochs, uuid, test_time):
+    lock.acquire()
+    global negotiate_count_num
+    global g_test_time
+    negotiate_count_num += 1
+    key = str(uuid) + "-" + str(epochs)
+    g_test_time[key] = test_time
+    lock.release()
+    if negotiate_count_num == args.num_users:
+        # check negotiate read first, since network delay may cause blockchain dirty read.
+        while True:
+            trigger_data = {
+                'message': 'CheckAccAlphaMapRead',
+                'epochs': epochs,
+            }
+            response = await http_client_post(blockchain_server_url, trigger_data)
+            if response is not None:
+                break
+            await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
+        # trigger STEP #6
+        trigger_data = {
+            'message': 'FindBestAlpha',
+            'epochs': epochs,
+        }
+        await http_client_post(blockchain_server_url, trigger_data)
 
 
 # STEP #7
 # Federated Learning: with new alpha, train w_local2, restart the round
 async def round_finish(data, uuid, epochs):
-    print('received alpha, train new w_glob for uuid: ' + uuid)
+    print('Received best alpha, train new w_local for user: %s, epoch: %s.' % (uuid, epochs))
     alpha = data.get("alpha")
-    accuracy = data.get("accuracy")
-    w_map = data.get("wMap")
-    w_glob_map = data.get("wGlobMap")
-    compressed_w_local = w_map[uuid].get("w")
-    compressed_w_glob = w_glob_map[uuid].get("w_glob")
-    w_local = conver_json_value_to_tensor(decompress_data(compressed_w_local))
-    w_glob = conver_json_value_to_tensor(decompress_data(compressed_w_glob))
     # calculate new w_glob (w_local2) according to the alpha
     w_local2 = {}
-    for key in w_glob.keys():
-        w_local2[key] = alpha * w_local[key] + (1 - alpha) * w_glob[key]
-
-    # start next round! Go to STEP #3
-    compressed_w_local2 = compress_data(convert_tensor_value_to_numpy(w_local2))
-    data = {
-        'w_glob': compressed_w_local2,
-    }
+    for key in my_global_model_tensor.keys():
+        w_local2[key] = alpha * my_local_model_tensor[key] + (1 - alpha) * my_global_model_tensor[key]
     # epochs count backwards until 0
     new_epochs = epochs - 1
     # fetch time record
@@ -536,7 +514,7 @@ async def round_finish(data, uuid, epochs):
     train_time = detail.get("train_time")
 
     # finally, test the acc_local, acc_local_skew1~4
-    # conver_json_value_to_tensor(w_local2)
+    # conver_numpy_value_to_tensor(w_local2)
     net_glob.load_state_dict(w_local2)
     net_glob.eval()
     test_addition_start_time = time.time()
@@ -579,23 +557,14 @@ async def round_finish(data, uuid, epochs):
                                + " <acc_local_skew4> " + str(acc_local_skew4.item())[:8]
                                + "\n")
     if new_epochs > 0:
-        from_ip = get_ip()
         body_data = {
             'message': 'next_round_count',
-            'data': data,
             'uuid': uuid,
             'epochs': epochs,
-            'from_ip': from_ip,
         }
         await http_client_post(trigger_url, body_data)
     else:
         print("##########\nALL DONE!\n##########")
-
-
-async def next_round_start(data, uuid, new_epochs):
-    print("####################\nEpoch #", new_epochs, " start now\n####################")
-    # reset a new time for next round
-    await train(data, uuid, new_epochs, time.time())
 
 
 # boot local raft process, preparing for the raft consensus algorithm
@@ -645,7 +614,7 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def conver_json_value_to_tensor(numpy_data):
+def conver_numpy_value_to_tensor(numpy_data):
     tensor_data = copy.deepcopy(numpy_data)
     for key, value in tensor_data.items():
         tensor_data[key] = torch.from_numpy(np.array(value))
@@ -682,151 +651,20 @@ def generate_md5_hash(model_weights):
     return data_md5
 
 
-class MainHandler(web.RequestHandler):
-
-    async def get(self):
-        response = await prepare()
-        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-        self.set_header("Content-Type", "application/json")
-        self.write(in_json)
-
-    async def post(self):
-        # reply to smart contract first
-        data = json.loads(self.request.body)
-        status = "yes"
-        detail = {}
-        self.set_header("Content-Type", "application/json")
-        response = {"status": status, "detail": detail}
-        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-        self.write(in_json)
-
-        # Then judge message type and process
-        message = data.get("message")
-        if message == "test":
-            test(data.get("data"))
-        elif message == "start":
-            asyncio.ensure_future(start())
-        elif message == "prepare":
-            asyncio.ensure_future(prepare(data.get("data"), data.get("uuid"), data.get("epochs")))
-        return
-
-
-# STEP #4
-# committee leader received all local models, aggregate to global model, then send the download link of global model
-# and the hash of global model to the ledger.
-async def train_count(epochs, uuid, start_time, train_time, w_compressed):
-    lock.acquire()
-    global train_count_num
-    global g_start_time
-    global g_train_time
-    global g_train_local_models
-    train_count_num += 1
-    print("Received a train_ready, now: " + str(train_count_num))
-    key = str(uuid) + "-" + str(epochs)
-    g_start_time[key] = start_time
-    g_train_time[key] = train_time
-    # append newly arrived w_local (decompressed) into g_train_local_models list for further aggregation
-    if epochs not in g_train_local_models:
-        g_train_local_models[epochs] = []
-    g_train_local_models[epochs].append(conver_json_value_to_tensor(decompress_data(w_compressed)))
-    lock.release()
-    if train_count_num == args.num_users:
-        print("Gathered enough train_ready, aggregate global model and send the download link.")
-        # aggregate global model first
-        w_glob = FedAvg(g_train_local_models[epochs])
-        # save global model for further download (compressed)
-        w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
-        g_train_local_models[epochs] = w_glob_compressed
-        # generate hash of global model
-        global_model_hash = generate_md5_hash(w_glob)
-        # send the download link and hash of global model to the ledger
-        body_data = {
-            'message': 'GlobalModelUpdate',
-            'data': {
-                'global_model_hash': global_model_hash,
-            },
-            'uuid': uuid,
-            'epochs': epochs,
-        }
-        print('aggregate global model finished, send global_model_hash [%s] to blockchain.' % global_model_hash)
-        await http_client_post(blockchain_server_url, body_data)
-
-
 async def download_global_model(epochs):
     detail = {
-        "global_model": g_train_local_models[epochs],
+        "global_model": g_train_global_models[epochs],
     }
     return detail
 
 
-# This is a blocking process until blockchain returns poll results
-async def poll_count(epochs, uuid):
-    lock.acquire()
-    global poll_count_num
-    poll_count_num += 1
-    print("Received a outlier_record_ready from " + str(uuid) + ", now: " + str(poll_count_num))
-    lock.release()
-    while True:
-        if poll_count_num == args.num_users:
-            print("Gathered enough outlier_record_ready, send to blockchain server. now: " + str(poll_count_num))
-            # check train read first, since network delay may cause blockchain dirty read.
-            while True:
-                trigger_data = {
-                    'message': 'check_poll_read',
-                    'epochs': epochs,
-                }
-                response = await http_client_post(blockchain_server_url, trigger_data)
-                if response is not None:
-                    break
-                await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
-
-            # get poll results, and go back continue to average w
-            trigger_data = {
-                'message': 'poll_ready',
-                'epochs': epochs,
-            }
-            result = await http_client_post(blockchain_server_url, trigger_data)
-            return result.decode("utf-8")
-        else:
-            # if not enough poll gathered, sleep for 1 second then retry.
-            await gen.sleep(1)
-
-
-async def negotiate_count(epochs, uuid, test_time):
-    lock.acquire()
-    global negotiate_count_num
-    global g_test_time
-    negotiate_count_num += 1
-    key = str(uuid) + "-" + str(epochs)
-    g_test_time[key] = test_time
-    lock.release()
-    if negotiate_count_num == args.num_users:
-        # check negotiate read first, since network delay may cause blockchain dirty read.
-        while True:
-            trigger_data = {
-                'message': 'check_negotiate_read',
-                'epochs': epochs,
-            }
-            response = await http_client_post(blockchain_server_url, trigger_data)
-            if response is not None:
-                break
-            await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
-
-        trigger_data = {
-            'message': 'negotiate_ready',
-            'epochs': epochs,
-        }
-        await http_client_post(blockchain_server_url, trigger_data)
-
-
-async def next_round_count(data, epochs, uuid, from_ip):
+async def next_round_count(epochs, uuid):
     global train_count_num
     global poll_count_num
     global negotiate_count_num
     global next_round_count_num
     lock.acquire()
     next_round_count_num += 1
-    ip_map[uuid] = from_ip
     lock.release()
     if next_round_count_num == args.num_users:
         # reset counts
@@ -836,19 +674,25 @@ async def next_round_count(data, epochs, uuid, from_ip):
         negotiate_count_num = 0
         next_round_count_num = 0
         lock.release()
+        # trigger next round's committee election
+        do_elect = True
+        # if re-elect committee members, shutdown the old raft network first
+        if do_elect == True:
+            await http_client_post("http://" + raft_leader_http_addr + "/shutdown", shutdown_raft)
         # sleep 20 seconds before trigger next round
         print("SLEEP FOR A WHILE...")
         await gen.sleep(20)
-        # trigger each node of python to next round
-        for user_id in ip_map.keys():
-            trigger_data = {
-                'message': 'next_round_start',
-                'uuid': user_id,
-                'epochs': epochs - 1,
-                'data': data,
-            }
-            my_url = "http://" + ip_map[user_id] + ":" + str(fed_listen_port) + "/trigger"
-            asyncio.ensure_future(http_client_post(my_url, trigger_data))
+        # START NEXT ROUND
+        new_epochs = epochs - 1
+        print("####################\nEpoch #", new_epochs, " start now\n####################")
+        body_data = {
+            'message': 'PrepareNextRoundCommittee',
+            'data': {
+                'do_elect': do_elect
+            },
+            'epochs': new_epochs,
+        }
+        await http_client_post(blockchain_server_url, body_data)
 
 
 async def fetch_time(uuid, epochs):
@@ -876,17 +720,12 @@ class TriggerHandler(web.RequestHandler):
         if message == "train_ready":
             await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"),
                               data.get("w_compressed"))
-        if message == "global_model":
+        elif message == "global_model":
             detail = await download_global_model(data.get("epochs"))
-            # done here
-        if message == "outlier_record_ready":
-            detail = await poll_count(data.get("epochs"), data.get("uuid"))
-        elif message == "negotiate_ready":
-            await negotiate_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
+        elif message == "acc_alpha_map_ready":
+            await acc_alpha_map_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "next_round_count":
-            await next_round_count(data.get("data"), data.get("epochs"), data.get("uuid"), data.get("from_ip"))
-        elif message == "next_round_start":
-            await next_round_start(data.get("data"), data.get("uuid"), data.get("epochs"))
+            await next_round_count(data.get("epochs"), data.get("uuid"))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 
@@ -895,18 +734,40 @@ class TriggerHandler(web.RequestHandler):
         self.write(in_json)
 
 
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
-        print("Detected IP address: " + IP)
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
+class MainHandler(web.RequestHandler):
+
+    async def get(self):
+        response = {
+            'status': 'yes'
+        }
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.set_header("Content-Type", "application/json")
+        self.write(in_json)
+
+    async def post(self):
+        # reply to smart contract first
+        data = json.loads(self.request.body)
+        status = "yes"
+        detail = {}
+        self.set_header("Content-Type", "application/json")
+        response = {"status": status, "detail": detail}
+        in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+        self.write(in_json)
+
+        # Then judge message type and process
+        message = data.get("message")
+        if message == "test":
+            test(data.get("data"))
+        elif message == "start":
+            asyncio.ensure_future(start())
+        elif message == "prepare":
+            asyncio.ensure_future(prepare_committee(data.get("uuid"), data.get("epochs"),
+                                                    data.get("data").get("do_elect")))
+        elif message == "global_model_update":
+            asyncio.ensure_future(calculate_acc_alpha(data.get("uuid"), data.get("epochs")))
+        elif message == "best_alpha":
+            asyncio.ensure_future(round_finish(data.get("data"), data.get("uuid"), data.get("epochs")))
+        return
 
 
 def make_app():
