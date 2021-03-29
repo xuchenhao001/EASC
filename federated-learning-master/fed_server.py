@@ -225,7 +225,7 @@ def init():
 # to the ledger.
 async def start():
     global global_model_hash
-    print("####################\nEpoch #", total_epochs, " start now\n####################")
+    print("######################\nEpoch #", total_epochs, " start now\n######################")
     # generate md5 hash from model, which is treated as global model of previous round.
     w = net_glob.state_dict()
     global_model_hash = generate_md5_hash(w)
@@ -399,8 +399,9 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
         await http_client_post(blockchain_server_url, body_data)
 
 
-# 5. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
-#    alpha-accuracy map, which will be uploaded to the committee leader.
+# STEP #5
+# BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
+# alpha-accuracy map, which will be uploaded to the committee leader.
 async def calculate_acc_alpha(uuid, epochs):
     global my_global_model_tensor
     print('Start calculate accuracy and alpha for user: %s, epoch: %s.' % (uuid, epochs))
@@ -490,7 +491,8 @@ async def acc_alpha_map_count(epochs, uuid, test_time):
 
 
 # STEP #7
-# Federated Learning: with new alpha, train w_local2, restart the round
+# BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
+# new local model. Test the new local model, then repeat from step 2.
 async def round_finish(data, uuid, epochs):
     print('Received best alpha, train new w_local for user: %s, epoch: %s.' % (uuid, epochs))
     alpha = data.get("alpha")
@@ -560,11 +562,61 @@ async def round_finish(data, uuid, epochs):
         body_data = {
             'message': 'next_round_count',
             'uuid': uuid,
-            'epochs': epochs,
+            'epochs': new_epochs,
         }
         await http_client_post(trigger_url, body_data)
     else:
         print("##########\nALL DONE!\n##########")
+
+
+# count for STEP #7 the next round requests gathered
+async def next_round_count(epochs):
+    global train_count_num
+    global poll_count_num
+    global negotiate_count_num
+    global next_round_count_num
+    lock.acquire()
+    next_round_count_num += 1
+    lock.release()
+    if next_round_count_num == args.num_users:
+        # reset counts
+        lock.acquire()
+        train_count_num = 0
+        poll_count_num = 0
+        negotiate_count_num = 0
+        next_round_count_num = 0
+        lock.release()
+        # trigger next round's committee election
+        do_elect = True
+        # if re-elect committee members, shutdown the old raft network first
+        if do_elect == True:
+            await http_client_post("http://" + raft_leader_http_addr + "/shutdown", shutdown_raft)
+        # sleep 20 seconds before trigger next round
+        print("SLEEP FOR A WHILE...")
+        await gen.sleep(20)
+        # START NEXT ROUND
+        print("######################\nEpoch #", epochs, " start now\n######################")
+        body_data = {
+            'message': 'PrepareNextRoundCommittee',
+            'data': {
+                'do_elect': do_elect
+            },
+            'epochs': epochs,
+        }
+        await http_client_post(blockchain_server_url, body_data)
+
+
+async def fetch_time(uuid, epochs):
+    key = str(uuid) + "-" + str(epochs)
+    start_time = g_start_time.get(key)
+    train_time = g_train_time.get(key)
+    test_time = g_test_time.get(key)
+    detail = {
+        "start_time": start_time,
+        "train_time": train_time,
+        "test_time": test_time,
+    }
+    return detail
 
 
 # boot local raft process, preparing for the raft consensus algorithm
@@ -658,56 +710,6 @@ async def download_global_model(epochs):
     return detail
 
 
-async def next_round_count(epochs, uuid):
-    global train_count_num
-    global poll_count_num
-    global negotiate_count_num
-    global next_round_count_num
-    lock.acquire()
-    next_round_count_num += 1
-    lock.release()
-    if next_round_count_num == args.num_users:
-        # reset counts
-        lock.acquire()
-        train_count_num = 0
-        poll_count_num = 0
-        negotiate_count_num = 0
-        next_round_count_num = 0
-        lock.release()
-        # trigger next round's committee election
-        do_elect = True
-        # if re-elect committee members, shutdown the old raft network first
-        if do_elect == True:
-            await http_client_post("http://" + raft_leader_http_addr + "/shutdown", shutdown_raft)
-        # sleep 20 seconds before trigger next round
-        print("SLEEP FOR A WHILE...")
-        await gen.sleep(20)
-        # START NEXT ROUND
-        new_epochs = epochs - 1
-        print("####################\nEpoch #", new_epochs, " start now\n####################")
-        body_data = {
-            'message': 'PrepareNextRoundCommittee',
-            'data': {
-                'do_elect': do_elect
-            },
-            'epochs': new_epochs,
-        }
-        await http_client_post(blockchain_server_url, body_data)
-
-
-async def fetch_time(uuid, epochs):
-    key = str(uuid) + "-" + str(epochs)
-    start_time = g_start_time.get(key)
-    train_time = g_train_time.get(key)
-    test_time = g_test_time.get(key)
-    detail = {
-        "start_time": start_time,
-        "train_time": train_time,
-        "test_time": test_time,
-    }
-    return detail
-
-
 class TriggerHandler(web.RequestHandler):
 
     async def post(self):
@@ -725,7 +727,7 @@ class TriggerHandler(web.RequestHandler):
         elif message == "acc_alpha_map_ready":
             await acc_alpha_map_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
         elif message == "next_round_count":
-            await next_round_count(data.get("epochs"), data.get("uuid"))
+            await next_round_count(data.get("epochs"))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 
