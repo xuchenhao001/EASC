@@ -18,15 +18,23 @@ Node.js v12.18.3 (npm 6.14.6)
 
 Golang v1.15.2
 
+> The EASC project should be cloned into the home directory, like `~/EASC`.
+
 ### Blockchain
 
 All blockchain scripts are under `fabric-samples` directory.
 
 ```bash
 cd fabric-samples/
-./download_env.sh
+./downloadEnv.sh
 ```
 
+#### RAFT consensus
+
+```bash
+cd raft/
+go build
+```
 
 ### Blockchain rest server
 
@@ -57,25 +65,48 @@ How to start & stop this project.
 
 ### Blockchain
 
+Before start blockchain network, you need to determine the number of nodes and their location in the network. The configure file is located at `fabric-samples/network.config`.
+
+For example, you have two nodes running on the same node `10.0.2.15`, then you can do it like:
+
 ```bash
-cd fabric-samples/network-10-peers/network-node01/
+#!/bin/bash
+PeerAddress=(
+  "10.0.2.15:7051"
+  "10.0.2.15:8051"
+)
+```
+
+Notice that all of the ports on the same node should be different and at a sequence like `7051`, `8051`, `9051` ... `30051`. (must be ended with `*051`)
+
+Another example is you have three nodes running the the different node (`10.0.2.15` and `10.0.2.16`), then your configuration could be like this:
+
+```bash
+#!/bin/bash
+PeerAddress=(
+  "10.0.2.15:7051"
+  "10.0.2.15:8051"
+  "10.0.2.16:7051"
+)
+```
+
+After modified the configuration file, now start your blockchain network:
+
+```bash
+cd fabric-samples/
 ./network.sh up createChannel && ./network.sh deployCC
 ```
 
-To stop your blockchain network:
+>  After finished experiment, stop your blockchain network with `./network.sh down`
 
-```bash
-sudo ./network.sh down
-```
-
-Open browser for couch db dashboards:
+Open browser for couch db dashboards (not supported for now):
 
 ```bash
 http://localhost:5984/_utils
 http://localhost:7984/_utils
 ```
 
-To export all of the data in couch db:
+To export all of the data in couch db  (not supported for now):
 
 ```bash
 # check all db names
@@ -86,22 +117,11 @@ curl -X GET http://127.0.0.1:5984/mychannel_fabcar/_all_docs\?include_docs\=true
 
 ### Blockchain rest server
 
-After you started a blockchain network, modify the network scale for rest server.
-
-```bash
-vim routes/rest/invoke-cc.js
-```
-
-> Modify constant variable `networkScale` to `network-2-peers`, `network-4-peers`, `network-10-peers` or `network-20-peers`.
-
-
-Start a blockchain rest server for communicate with blockchain network.
+After you started a blockchain network, start a blockchain rest server for the communicate between python federated learning processes with blockchain smart contract.
 
 ```bash
 cd blockchain-server/
-rm -rf routes/rest/wallet/
-npm start
-# Or start in background:
+# Start in background:
 nohup npm start > server.log 2>&1 &
 ```
 
@@ -109,10 +129,8 @@ nohup npm start > server.log 2>&1 &
 
 ```bash
 cd federated-learning-master/
-rm -f time-record_*
-# modify user_number to 2, 4, 10 or 20
-vim fed_server.py
-# modify gpu to use, such as 5
+rm -f result-*
+# modify federated learning parameters. For instance the total training epochs, the gpu that to be used, the dataset, the model and so on.
 vim utils/options.py
 python3 fed_server.py
 # Or start in background

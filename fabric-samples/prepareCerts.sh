@@ -14,18 +14,16 @@ source scriptUtils.sh
 function releaseCerts() {
   tar -zcf networkCache.tar.gz network-cache/
   for i in "${!PeerAddress[@]}"; do
-  	addrIN=(${PeerAddress[i]//:/ })
-  	# check ssh connection first
-  	status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
-  	if [[ $status != "ok" ]]; then
-  		echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
-  		exit 1
-  	fi
+    addrIN=(${PeerAddress[i]//:/ })
+    # check ssh connection first
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    if [[ $status != "ok" ]]; then
+      echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+      exit 1
+    fi
     scp networkCache.tar.gz ubuntu@${addrIN[0]}:~/EASC/fabric-samples/networkCache.tar.gz
-    # ssh ubuntu@${AllNodesAddrs[$i]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz && rm -f networkCache.tar.gz && ./network.sh up"
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz && rm -f networkCache.tar.gz"
+    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz"
   done
-  rm -f networkCache.tar.gz
 }
 
 function createOrgs() {
@@ -80,10 +78,10 @@ function json_ccp {
 }
 
 function ccpGenerate() {
-	for i in "${!PeerAddress[@]}"; do
-	  addrIN=(${PeerAddress[i]//:/ })
-	  echo "$(json_ccp $((i+1)) ${addrIN[0]} ${addrIN[1]} $((addrIN[1]+3)) network-cache/peerOrganizations/org$((i+1)).example.com/tlsca/tlsca.org$((i+1)).example.com-cert.pem network-cache/peerOrganizations/org$((i+1)).example.com/ca/ca.org$((i+1)).example.com-cert.pem)" > network-cache/peerOrganizations/org$((i+1)).example.com/connection-org$((i+1)).json
-	done
+  for i in "${!PeerAddress[@]}"; do
+    addrIN=(${PeerAddress[i]//:/ })
+    echo "$(json_ccp $((i+1)) ${addrIN[0]} ${addrIN[1]} $((addrIN[1]+3)) network-cache/peerOrganizations/org$((i+1)).example.com/tlsca/tlsca.org$((i+1)).example.com-cert.pem network-cache/peerOrganizations/org$((i+1)).example.com/ca/ca.org$((i+1)).example.com-cert.pem)" > network-cache/peerOrganizations/org$((i+1)).example.com/connection-org$((i+1)).json
+  done
 }
 
 # USING_ORG=org1
@@ -211,7 +209,7 @@ function prepareCoreConfig() {
 # prepare configtx.yaml
 ##########################
 function generateConfigTX() {
-	ORGS_DETAIL=""
+  ORGS_DETAIL=""
   for i in "${!PeerAddress[@]}"; do
       addrIN=(${PeerAddress[i]//:/ })
       ORGS_DETAIL=$(echo -e "$ORGS_DETAIL\n$(parseOrgDetail $((i+1)) ${addrIN[0]} ${addrIN[1]})")
@@ -345,5 +343,4 @@ function main() {
 }
 
 main
-
 

@@ -739,6 +739,7 @@ class TriggerHandler(web.RequestHandler):
 class MainHandler(web.RequestHandler):
 
     async def get(self):
+        asyncio.ensure_future(start())
         response = {
             'status': 'yes'
         }
@@ -760,8 +761,6 @@ class MainHandler(web.RequestHandler):
         message = data.get("message")
         if message == "test":
             test(data.get("data"))
-        elif message == "start":
-            asyncio.ensure_future(start())
         elif message == "prepare":
             asyncio.ensure_future(prepare_committee(data.get("uuid"), data.get("epochs"),
                                                     data.get("data").get("do_elect")))
