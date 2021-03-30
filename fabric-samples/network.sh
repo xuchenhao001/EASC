@@ -217,13 +217,20 @@ function networkDown() {
         exit 1
     fi
 
-    COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
+    count=$(ls -l network-cache/docker-compose* 2>/dev/null | wc -l)
+    if [ $count != 0 ]; then
+        COMPOSE_FILES=""
+        LOCAL_COMPOSE_FILES=($(ls -d network-cache/docker-compose*))
+        for j in "${!LOCAL_COMPOSE_FILES[@]}"; do
+          COMPOSE_FILES="${COMPOSE_FILES} -f ${LOCAL_COMPOSE_FILES[j]}"
+        done
 
-    if [[ $i -eq 0 ]]; then
-      COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
+        if [[ $i -eq 0 ]]; then
+          COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
+        fi
+
+        ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
     fi
-
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
   done
 
   # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
