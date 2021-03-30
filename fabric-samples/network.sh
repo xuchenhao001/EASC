@@ -140,9 +140,9 @@ function networkUp() {
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
     # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
     if [[ $status != "ok" ]]; then
-        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+        echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
         exit 1
     fi
 
@@ -158,7 +158,7 @@ function networkUp() {
       COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
 
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1"
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1"
   done
 
 }
@@ -167,7 +167,7 @@ function cleanLogs() {
   rm -f ~/EASC/federated-learning-master/result-record_*.txt
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
-    ssh ubuntu@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+    ssh ${HostUser}@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
   done
 }
 
@@ -211,9 +211,9 @@ function networkDown() {
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
     # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
     if [[ $status != "ok" ]]; then
-        echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+        echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
         exit 1
     fi
 
@@ -229,7 +229,7 @@ function networkDown() {
           COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
         fi
 
-        ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
+        ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
     fi
   done
 

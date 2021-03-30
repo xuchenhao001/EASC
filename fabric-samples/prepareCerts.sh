@@ -16,13 +16,13 @@ function releaseCerts() {
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
     # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@${addrIN[0]} echo ok 2>&1)
+    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
     if [[ $status != "ok" ]]; then
-      echo "Please add your public key to other hosts with user \"ubuntu\" before release certs through command \"ssh-copy-id\"!"
+      echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
       exit 1
     fi
-    scp networkCache.tar.gz ubuntu@${addrIN[0]}:~/EASC/fabric-samples/networkCache.tar.gz
-    ssh ubuntu@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz"
+    scp networkCache.tar.gz ${HostUser}@${addrIN[0]}:~/EASC/fabric-samples/networkCache.tar.gz
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz"
   done
 }
 
@@ -343,4 +343,5 @@ function main() {
 }
 
 main
+
 
