@@ -25,7 +25,8 @@ How to install this project on your operating system.
 ```bash
 # First generate an SSH key for each node (on host A,B,C, ...)
 ssh-keygen
-# Then install the SSH key (from host A) to other hosts (to host B, C, ...) as an authorized key
+# Then install the SSH key (from host A) to other hosts (to host A, B, C, ...) as an authorized key
+ssh-copy-id <hostA-user>@<hostA-ip>
 ssh-copy-id <hostB-user>@<hostB-ip>
 ssh-copy-id <hostC-user>@<hostC-ip>
 ...
