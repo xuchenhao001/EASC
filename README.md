@@ -8,17 +8,28 @@ How to install this project on your operating system.
 
 ### Prerequisite
 
-Ubuntu 18.04
+* Ubuntu 18.04
 
-Python 3.6.9 (pip 9.0.1)
+* Python 3.6.9 (pip 9.0.1)
 
-Docker 19.03.12 (docker-compose 1.26.2)
+* Docker 19.03.12 (docker-compose 1.26.2)
 
-Node.js v12.18.3 (npm 6.14.6)
+* Node.js v12.18.3 (npm 6.14.6)
 
-Golang v1.15.2
+* Golang v1.15.2
 
-> The EASC project should be cloned into the home directory, like `~/EASC`.
+* The EASC project should be cloned into the home directory, like `~/EASC`.
+
+* A password-free login from a host (host A) to other hosts (host B, C, ...) in the cluster:
+
+```bash
+# First generate an SSH key for each node (on host A,B,C, ...)
+ssh-keygen
+# Then install the SSH key (from host A) to other hosts (to host B, C, ...) as an authorized key
+ssh-copy-id <hostB-user>@<hostB-ip>
+ssh-copy-id <hostC-user>@<hostC-ip>
+...
+```
 
 ### Blockchain
 
