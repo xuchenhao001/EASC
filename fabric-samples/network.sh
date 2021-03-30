@@ -217,7 +217,7 @@ function networkDown() {
         exit 1
     fi
 
-    count=$(ls -l network-cache/docker-compose* 2>/dev/null | wc -l)
+    count=$(ls -l network-cache/*.yaml 2>/dev/null | wc -l)
     if [ $count != 0 ]; then
         COMPOSE_FILES=""
         LOCAL_COMPOSE_FILES=($(ls -d network-cache/docker-compose*))
