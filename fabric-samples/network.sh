@@ -7,7 +7,8 @@ export FABRIC_CFG_PATH=${PWD}/network-cache/
 export VERBOSE=false
 
 source ./network.config
-source scriptUtils.sh
+source ./scriptUtils.sh
+source ./.env
 
 # Print the usage message
 function printHelp() {
@@ -158,7 +159,7 @@ function networkUp() {
       COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
 
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1"
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGE_TAG COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME SYS_CHANNEL=$SYS_CHANNEL docker-compose ${COMPOSE_FILES} up -d 2>&1"
   done
 
 }
@@ -217,20 +218,17 @@ function networkDown() {
         exit 1
     fi
 
-    count=$(ls -l network-cache/*.yaml 2>/dev/null | wc -l)
-    if [ $count != 0 ]; then
-        COMPOSE_FILES=""
-        LOCAL_COMPOSE_FILES=($(ls -d network-cache/docker-compose*))
-        for j in "${!LOCAL_COMPOSE_FILES[@]}"; do
-          COMPOSE_FILES="${COMPOSE_FILES} -f ${LOCAL_COMPOSE_FILES[j]}"
-        done
+    COMPOSE_FILES=""
+    COMPOSE_FILES_LIST=($(ssh ${HostUser}@${addrIN[0]} "ls -d ~/EASC/fabric-samples/network-cache/docker-compose*"))
+    for j in "${!COMPOSE_FILES_LIST[@]}"; do
+      COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILES_LIST[j]}"
+    done
 
-        if [[ $i -eq 0 ]]; then
-          COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
-        fi
-
-        ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
+    if [[ $i -eq 0 ]]; then
+      COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
+
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
   done
 
   # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
@@ -388,5 +386,6 @@ else
   printHelp
   exit 1
 fi
+
 
 
