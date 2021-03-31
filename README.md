@@ -77,12 +77,13 @@ How to start & stop this project.
 
 ### Blockchain
 
-Before start blockchain network, you need to determine the number of nodes and their location in the network. The configure file is located at `fabric-samples/network.config`.
+Before start blockchain network, you need to determine the number of blockchain nodes, the user name (should be the same) of remote hosts, and their location in the network. The configure file is located at `fabric-samples/network.config`.
 
-For example, you have two nodes running on the same node `10.0.2.15`, then you can do it like:
+For example, you have two nodes running on the same node `10.0.2.15`, the user name of the host is `xueri`, then you can do it like:
 
 ```bash
 #!/bin/bash
+HostUser="xueri"
 PeerAddress=(
   "10.0.2.15:7051"
   "10.0.2.15:8051"
@@ -91,10 +92,11 @@ PeerAddress=(
 
 Notice that all of the ports on the same node should be different and at a sequence like `7051`, `8051`, `9051` ... `30051`. (must be ended with `*051`)
 
-Another example is you have three nodes running the the different node (`10.0.2.15` and `10.0.2.16`), then your configuration could be like this:
+Another example is you have three nodes running the the different hosts (`10.0.2.15` and `10.0.2.16`) and the user name for all the hosts is `ubuntu`, then your configuration could be like this:
 
 ```bash
 #!/bin/bash
+HostUser="ubuntu"
 PeerAddress=(
   "10.0.2.15:7051"
   "10.0.2.15:8051"
