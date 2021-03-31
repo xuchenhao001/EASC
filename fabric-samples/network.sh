@@ -159,7 +159,7 @@ function networkUp() {
       COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
 
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && IMAGE_TAG=$IMAGE_TAG COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME SYS_CHANNEL=$SYS_CHANNEL docker-compose ${COMPOSE_FILES} up -d 2>&1"
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && ${COMPOSE_CMD} ${COMPOSE_FILES} up -d 2>&1"
   done
 
 }
@@ -228,10 +228,8 @@ function networkDown() {
       COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
 
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
+    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (${COMPOSE_CMD} ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
   done
-
-  # docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH down --volumes --remove-orphans
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
@@ -250,6 +248,8 @@ CHANNEL_NAME="mychannel"
 # COMPOSE_FILE_COUCH=docker/docker-compose-couch.yaml
 # certificate authorities compose file
 COMPOSE_FILE_CA=docker/docker-compose-ca.yaml
+# docker-compose command with environment variables
+COMPOSE_CMD="IMAGE_TAG=$IMAGE_TAG COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME SYS_CHANNEL=$SYS_CHANNEL docker-compose"
 #
 # use golang as the default language for chaincode
 CC_SRC_LANGUAGE=golang
