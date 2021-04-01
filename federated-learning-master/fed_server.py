@@ -225,7 +225,6 @@ def init():
     # generate md5 hash from model, which is treated as global model of previous round.
     w = net_glob.state_dict()
     global_model_hash = generate_md5_hash(w)
-    print('calculated global model hash: ' + global_model_hash)
 
 
 # STEP #1
@@ -258,6 +257,7 @@ async def prepare_committee(uuid, epochs, do_elect):
     # if need, re-elect the committee members
     if do_elect:
         print('[RAFT] Received elect request! Elect new committee members!')
+        print('[RAFT] Current global model hash: ' + global_model_hash)
         committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
         committee_highest_id = committee_proportion_num + committee_leader_id - 1
@@ -395,6 +395,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
         g_train_global_models[epochs] = w_glob_compressed
         # generate hash of global model
         global_model_hash = generate_md5_hash(w_glob)
+        print("Calculated new global model hash: " + global_model_hash)
         # send the download link and hash of global model to the ledger
         body_data = {
             'message': 'GlobalModelUpdate',
