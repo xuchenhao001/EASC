@@ -256,7 +256,7 @@ async def prepare_committee(uuid, epochs, do_elect):
         committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
         committee_highest_id = committee_proportion_num + committee_leader_id - 1
-        print('[RAFT] The leader id is: %s', str(committee_leader_id))
+        print('[RAFT] The leader id is: %s' % str(committee_leader_id))
         # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
         if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
             print("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
@@ -269,7 +269,7 @@ async def prepare_committee(uuid, epochs, do_elect):
 
         # if this node is elected as committee leader, boot the raft network.
         if int(uuid) == committee_leader_id:
-            print("[RAFT] Find out the leader ID: " + uuid)
+            print("[RAFT] Match the leader ID: " + uuid)
             print("[RAFT] # BOOT RAFT CONSENSUS NETWORK! #")
             client_addrs = []
             client_raft_addrs = []
