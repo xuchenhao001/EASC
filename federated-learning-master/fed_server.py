@@ -249,16 +249,17 @@ async def start():
 async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
     global shutdown_raft
-    print('Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
+    print('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
     # if need, re-elect the committee members
     if do_elect:
-        print('Received elect request! Elect new committee members!')
+        print('[RAFT] Received elect request! Elect new committee members!')
         committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
         committee_highest_id = committee_proportion_num + committee_leader_id - 1
+        print('[RAFT] The leader id is: %s', str(committee_leader_id))
         # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
         if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
-            print("# BOOT LOCAL RAFT PROCESS! #")
+            print("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
             http_addr, raft_addr = generate_raft_addr_info(uuid)
             boot_local_raft_proc(uuid, http_addr, raft_addr)
         # wait for a while in case raft processes on some nodes are not running.
@@ -268,13 +269,13 @@ async def prepare_committee(uuid, epochs, do_elect):
 
         # if this node is elected as committee leader, boot the raft network.
         if int(uuid) == committee_leader_id:
-            print("Find out the leader ID: " + uuid)
-            print("# BOOT RAFT CONSENSUS NETWORK! #")
+            print("[RAFT] Find out the leader ID: " + uuid)
+            print("[RAFT] # BOOT RAFT CONSENSUS NETWORK! #")
             client_addrs = []
             client_raft_addrs = []
             client_ids = []
             # i starts from the leader id and end at committee highest id
-            print("committee_highest_id: " + str(committee_highest_id))
+            print("[RAFT] committee_highest_id: " + str(committee_highest_id))
             for i in range(int(uuid) + 1, committee_highest_id + 1):
                 if i > args.num_users:
                     index = i % args.num_users
