@@ -222,6 +222,7 @@ def init():
     # generate md5 hash from model, which is treated as global model of previous round.
     w = net_glob.state_dict()
     global_model_hash = generate_md5_hash(w)
+    print('calculated global model hash: ' + global_model_hash)
 
 
 # STEP #1
