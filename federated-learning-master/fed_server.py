@@ -161,7 +161,9 @@ def init():
     peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
     peer_address_list = peerAddressVar.split(' ')
     peerHeaderAddr = peer_address_list[0].split(":")[0]
+    # initially the blockchain communicate server is load on the first peer
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
+    # initially the trigger url is load on the first peer (will change when raft committee do elect)
     trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
 
     # parse args
@@ -230,8 +232,6 @@ def init():
 # (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
 # to the ledger.
 async def start():
-    print("######################\nEpoch #", total_epochs, " start now\n######################")
-
     # upload md5 hash to ledger
     body_data = {
         'message': 'Start',
@@ -250,7 +250,10 @@ async def start():
 # send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
 async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
+    global trigger_url
     global shutdown_raft
+    print("######################\nEpoch #", epochs, " start now\n######################")
+
     print('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
     # if need, re-elect the committee members
     if do_elect:
@@ -259,6 +262,9 @@ async def prepare_committee(uuid, epochs, do_elect):
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
         committee_highest_id = committee_proportion_num + committee_leader_id - 1
         print('[RAFT] The leader id is: %s' % str(committee_leader_id))
+        # update trigger url based on committee leader (to accept the global model or local models)
+        trigger_ip = peer_address_list[int(committee_leader_id) - 1].split(":")[0]
+        trigger_url = "http://" + trigger_ip + ":" + str(fed_listen_port) + "/trigger"
         # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
         if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
             print("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
@@ -599,7 +605,6 @@ async def next_round_count(epochs):
         print("SLEEP FOR A WHILE...")
         await gen.sleep(20)
         # START NEXT ROUND
-        print("######################\nEpoch #", epochs, " start now\n######################")
         body_data = {
             'message': 'PrepareNextRoundCommittee',
             'data': {
