@@ -33,6 +33,7 @@ from models.test import test_img, test_img_total
 from tornado import httpclient, ioloop, web, gen
 
 np.random.seed(0)
+torch.random.manual_seed(0)
 
 # TO BE CHANGED
 # attackers' ids, must be string type "1", "2", ...
