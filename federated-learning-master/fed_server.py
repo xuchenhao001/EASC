@@ -154,6 +154,7 @@ def init():
     global blockchain_server_url
     global trigger_url
     global peer_address_list
+    global global_model_hash
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
     peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
@@ -218,17 +219,17 @@ def init():
         exit('Error: unrecognized model')
     # finally trained the initial local model, which will be treated as first global model.
     net_glob.train()
+    # generate md5 hash from model, which is treated as global model of previous round.
+    w = net_glob.state_dict()
+    global_model_hash = generate_md5_hash(w)
 
 
 # STEP #1
 # (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
 # to the ledger.
 async def start():
-    global global_model_hash
     print("######################\nEpoch #", total_epochs, " start now\n######################")
-    # generate md5 hash from model, which is treated as global model of previous round.
-    w = net_glob.state_dict()
-    global_model_hash = generate_md5_hash(w)
+
     # upload md5 hash to ledger
     body_data = {
         'message': 'Start',
