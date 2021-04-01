@@ -395,7 +395,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
         g_train_global_models[epochs] = w_glob_compressed
         # generate hash of global model
         global_model_hash = generate_md5_hash(w_glob)
-        print("Calculated new global model hash: " + global_model_hash)
+        print("As a committee leader, calculate new global model hash: " + global_model_hash)
         # send the download link and hash of global model to the ledger
         body_data = {
             'message': 'GlobalModelUpdate',
@@ -415,6 +415,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
 # alpha-accuracy map, which will be uploaded to the committee leader.
 async def calculate_acc_alpha(uuid, epochs):
     global my_global_model_tensor
+    global global_model_hash
     print('Start calculate accuracy and alpha for user: %s, epoch: %s.' % (uuid, epochs))
     # download global model
     body_data = {
@@ -427,6 +428,9 @@ async def calculate_acc_alpha(uuid, epochs):
     detail = responseObj.get("detail")
     global_model_compressed = detail.get("global_model")
     w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+    # load hash of new global model, which is downloaded from the leader
+    global_model_hash = generate_md5_hash(w_glob)
+    print("As a follower, received new global model with hash: " + global_model_hash)
     # update local cached global model for this epoch
     my_global_model_tensor = w_glob
 
