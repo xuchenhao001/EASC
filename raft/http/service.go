@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -241,16 +240,20 @@ func (s *Service) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	}
 	// then kill itself
 	w.WriteHeader(http.StatusOK)
-	go func() {
-		os.Exit(0)
-	}()
+	s.stopListener()
 }
 
 // remote controllable kill process
 func (s *Service) handleKill(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+	s.stopListener()
+}
+
+func (s *Service) stopListener() {
 	go func() {
-		os.Exit(0)
+		log.Printf("[Shutdown] Close http listener and shutdown the process.")
+		s.Close() // close the net.http listen
+		//os.Exit(0)
 	}()
 }
 
