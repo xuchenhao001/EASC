@@ -641,9 +641,11 @@ def boot_local_raft_proc(uuid, http_addr, raft_addr):
 
 # kill local raft process
 def kill_local_raft_proc():
+    global raft_subprocess
     if raft_subprocess is not None:
         print("[RAFT] Found raft subprocess. Kill it now.")
         raft_subprocess.kill()
+        raft_subprocess = None
     else:
         print("[RAFT] Didn't find raft subprocess. Do not kill.")
 
