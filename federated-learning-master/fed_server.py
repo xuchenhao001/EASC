@@ -73,11 +73,11 @@ poll_count_num = 0
 negotiate_count_num = 0
 next_round_count_num = 0
 peer_address_list = []
-shutdown_raft = {}
 raft_leader_http_addr = ""
 my_local_model_tensor = {}
 my_global_model_tensor = {}
 global_model_hash = ""
+raft_subprocess = None
 # Global parameters for the committee leader
 train_count_num = 0
 g_start_time = {}
@@ -250,13 +250,13 @@ async def start():
 async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
     global trigger_url
-    global shutdown_raft
     print("######################\nEpoch #", epochs, " start now\n######################")
 
     print('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
     # if need, re-elect the committee members
     if do_elect:
-        print('[RAFT] Received elect request! Elect new committee members!')
+        print('[RAFT] Received elect request! Kill the old raft processes and elect new committee members!')
+        kill_local_raft_proc()
         print('[RAFT] Current global model hash: ' + global_model_hash)
         committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
@@ -302,9 +302,6 @@ async def prepare_committee(uuid, epochs, do_elect):
                 'clientRaftAddrs': client_raft_addrs,
                 'clientIds': client_ids,
             }
-            # update shutdown request
-            shutdown_raft = body_data
-            shutdown_raft['message'] = 'raft_shutdown'
             await http_client_post("http://" + raft_leader_http_addr + "/setup", body_data)
 
             # finally send raft network info to the ledger
@@ -603,9 +600,6 @@ async def next_round_count(epochs):
         lock.release()
         # trigger next round's committee election
         do_elect = True
-        # if re-elect committee members, shutdown the old raft network first
-        if do_elect == True:
-            await http_client_post("http://" + raft_leader_http_addr + "/shutdown", shutdown_raft)
         # sleep 20 seconds before trigger next round
         print("SLEEP FOR A WHILE...")
         await gen.sleep(20)
@@ -635,12 +629,23 @@ async def fetch_time(uuid, epochs):
 
 # boot local raft process, preparing for the raft consensus algorithm
 def boot_local_raft_proc(uuid, http_addr, raft_addr):
+    global raft_subprocess
     node_id = "node" + str(uuid)
     real_path = os.path.dirname(os.path.realpath(__file__))
     hraftd_path = os.path.join(real_path, "../raft/hraftd")
     snapshot_path = os.path.join(real_path, "../raft/" + node_id)
-    subprocess.Popen([hraftd_path, "-id", node_id, "-haddr", http_addr, "-raddr", raft_addr, snapshot_path])
+    raft_subprocess = subprocess.Popen([hraftd_path, "-id", node_id, "-haddr", http_addr, "-raddr", raft_addr,
+                                        snapshot_path])
     return
+
+
+# kill local raft process
+def kill_local_raft_proc():
+    if raft_subprocess is not None:
+        print("[RAFT] Found raft subprocess. Kill it now.")
+        raft_subprocess.kill()
+    else:
+        print("[RAFT] Didn't find raft subprocess. Do not kill.")
 
 
 # generate raft address info from uuid

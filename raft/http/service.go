@@ -86,12 +86,6 @@ func (s *Service) Start() error {
 	return nil
 }
 
-// Close closes the service.
-func (s *Service) Close() {
-	s.ln.Close()
-	return
-}
-
 // ServeHTTP allows Service to serve HTTP requests.
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/key") {
@@ -104,10 +98,6 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleInit(w, r)
 	} else if r.URL.Path == "/info" {
 		s.handleInfo(w, r)
-	} else if r.URL.Path == "/shutdown" {
-		s.handleShutdown(w, r)
-	} else if r.URL.Path == "/kill" {
-		s.handleKill(w, r)
 	} else {
 		log.Printf("Error: unknown URL path: " + r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
@@ -222,41 +212,6 @@ func (s *Service) handleJoin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
-// remote shutdown raft cluster
-func (s *Service) handleShutdown(w http.ResponseWriter, r *http.Request) {
-	var m SetupRequest
-	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// kill clients first
-	for i := range m.ClientAddrs {
-		resetURL := "http://" + m.ClientAddrs[i] + "/kill"
-		if _, err := sendRequest(resetURL, []byte("")); err != nil {
-			log.Fatalf("failed to kill client: %s", err.Error())
-		}
-	}
-	// then kill itself
-	w.WriteHeader(http.StatusOK)
-	s.stopListener()
-}
-
-// remote controllable kill process
-func (s *Service) handleKill(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	s.stopListener()
-}
-
-func (s *Service) stopListener() {
-	go func() {
-		log.Printf("[Shutdown] Close http listener and shutdown the process.")
-		s.Close() // close the net.http listen
-		//os.Exit(0)
-	}()
-}
-
 
 func (s *Service) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
 	getKey := func() string {
