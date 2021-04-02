@@ -266,7 +266,11 @@ async def prepare_committee(uuid, epochs, do_elect):
         trigger_ip = peer_address_list[int(committee_leader_id) - 1].split(":")[0]
         trigger_url = "http://" + trigger_ip + ":" + str(fed_listen_port) + "/trigger"
         # pull up hraftd distributed processes, if the value of uuid is in range of committee leader id and highest id.
-        if int(uuid) <= committee_highest_id or int(uuid) <= committee_highest_id % args.num_users:
+        rounded_committee_highest_id = 0
+        if committee_highest_id > args.num_users:
+            rounded_committee_highest_id = committee_highest_id % args.num_users
+        if committee_leader_id <= int(uuid) <= committee_highest_id or \
+                1 <= int(uuid) <= rounded_committee_highest_id:
             print("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
             http_addr, raft_addr = generate_raft_addr_info(uuid)
             boot_local_raft_proc(uuid, http_addr, raft_addr)
