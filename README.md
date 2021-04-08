@@ -132,6 +132,10 @@ curl -X GET http://127.0.0.1:5984/_all_dbs
 curl -X GET http://127.0.0.1:5984/mychannel_fabcar/_all_docs\?include_docs\=true > ./couchdb.json
 ```
 
+The output logs of the federated learning are at `EASC/server_<your-node-IP>.log` of each node.
+
+The training results are at `EASC/federated-learning/result-record_*.txt` of each node.
+
 ### Blockchain rest server
 
 After you started a blockchain network, start a blockchain rest server for the communicate between python federated learning processes with blockchain smart contract.
@@ -145,7 +149,7 @@ nohup npm start > server.log 2>&1 &
 ### Federated Learning
 
 ```bash
-cd federated-learning-master/
+cd federated-learning/
 rm -f result-*
 # modify federated learning parameters. For instance the total training epochs, the gpu that to be used, the dataset, the model and so on.
 vim utils/options.py
@@ -158,6 +162,18 @@ Trigger training start:
 
 ```bash
 curl -i -X GET 'http://localhost:8888/messages'
+```
+
+# Comparative Experiments
+
+The comparative experiments include (under `EASC/federated-learning/` directory):
+
+```bash
+fed_server.py  # our proposed schema (need for blockchain)
+fed_server_alpha.py  # our proposed schema with fixed alpha (need for blockchain)
+main_fed_localA.py  # Adaptive personalized federated learning (APFL) (no need for blockchain)
+main_nn.py  # local deep learning algorithm (Local Training) (no need for blockchain)
+main_fed.py  # FedAvg algorithm (no need for blockchain)
 ```
 
 # BUG FIX

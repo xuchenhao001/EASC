@@ -7,7 +7,7 @@ for i in "${!PeerAddress[@]}"; do
   
   ssh ${HostUser}@${addrIN[0]} "kill -9 \$(ps -ef|grep '[f]ed_server.py'|awk '{print \$2}')"
   ssh ${HostUser}@${addrIN[0]} "kill -9 \$(ps -ef|grep '[h]raftd'|awk '{print \$2}')"
-  ssh ${HostUser}@${addrIN[0]} "(cd ~/EASC/federated-learning-master/; python3 -u fed_server.py) > server_${addrIN[0]}.log 2>&1 &"
+  ssh ${HostUser}@${addrIN[0]} "(cd ~/EASC/federated-learning/; python3 -u fed_server.py) > ~/EASC/server_${addrIN[0]}.log 2>&1 &"
 done
 
 

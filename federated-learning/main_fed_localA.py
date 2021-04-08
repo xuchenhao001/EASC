@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 import asyncio
+import os
+import subprocess
+
 import matplotlib
 import threading
 from threading import Thread
@@ -26,14 +29,17 @@ from models.test import test_img_total
 torch.manual_seed(0)
 np.random.seed(0)
 
-trigger_url = "http://10.137.3.70:8181/messages"
-# trigger_url = "http://localhost:8181/messages"
 # TO BE CHANGED
 # how many threads on a node
 thread_num = 1
 # wait in seconds for other nodes to start
 start_wait_time = 15
+# federated learning server listen port
+fed_listen_port = 8888
 # TO BE CHANGED FINISHED
+
+# NOT TO TOUCH VARIABLES BELOW
+trigger_url = ""
 g_user_id = 0
 lock = threading.Lock()
 wMap = {}
@@ -58,7 +64,18 @@ differenc1 = None
 differenc2 = None
 
 
+# returns variable from sourcing a file
+def env_from_sourcing(file_to_source_path, variable_name):
+    source = 'source %s && export MYVAR=$(echo "${%s[@]}")' % (file_to_source_path, variable_name)
+    # dump = '/usr/bin/python3 -c "import os, json; print(json.dumps(dict(os.getenv(\'MYVAR\'))))"'
+    dump = '/usr/bin/python3 -c "import os, json; print(os.getenv(\'MYVAR\'))"'
+    pipe = subprocess.Popen(['/bin/bash', '-c', '%s && %s' % (source, dump)], stdout=subprocess.PIPE)
+    # return json.loads(pipe.stdout.read())
+    return pipe.stdout.read().decode("utf-8").rstrip()
+
+
 async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
+    global trigger_url
     global net_glob
     global args
     global dataset_train
@@ -76,6 +93,15 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
     # parse args
     args = args_parser()
     args.device = torch.device('cpu')
+
+    # parse network.config and read the peer addresses
+    real_path = os.path.dirname(os.path.realpath(__file__))
+    peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
+    peer_address_list = peerAddressVar.split(' ')
+    peerHeaderAddr = peer_address_list[0].split(":")[0]
+    trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
+    # parse participant number
+    args.num_users = len(peer_address_list)
 
     # the first time to train, init net_glob
     if epochs is None:
@@ -472,6 +498,6 @@ if __name__ == "__main__":
     #     thread.join()
 
     app = make_app()
-    app.listen(8181)
-    print("start serving at 8181...")
+    app.listen(fed_listen_port)
+    print("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()

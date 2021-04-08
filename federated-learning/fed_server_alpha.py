@@ -36,12 +36,10 @@ np.random.seed(0)
 torch.random.manual_seed(0)
 
 # TO BE CHANGED
+# alpha (stable)
+hyperpara = 0.75
 # attackers' ids, must be string type "1", "2", ...
 attackers_id = []
-# alpha minimum
-hyperpara_min = 0.5
-# alpha maximum
-hyperpara_max = 0.8
 # rounds to negotiate alpha
 negotiate_round = 10
 # committee members proportion
@@ -85,24 +83,6 @@ g_train_time = {}
 g_train_local_models = {}
 g_train_global_models = {}
 g_test_time = {}
-
-
-######## Federated Learning process ########
-# 0. the client send a train request to BC-node1-python
-# 1. (prepare for the training) BC-node1-python initiate local (global) model, and then send the hash of global model
-#    to the ledger.
-# 2. BC-nodes-python choose committee members according to global model hash, pull up hraftd distributed processes,
-#    send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
-# 3. BC-nodes-python train local model based on previous round's local model, send local model to the committee leader,
-#    send hash of local model to the ledger.
-# 4. committee leader received all local models, aggregate to global model, then send the download link of global model
-#    and the hash of global model to the ledger.
-# 5. BC-nodes-python get the download link of global model from the ledger, download the global model, then calculate
-#    alpha-accuracy map, which will be uploaded to the ledger.
-# 6. Smart Contract pick up the appropriate alpha according to the rule after gathering all alpha-accuracy maps, save
-#    to the ledger.
-# 7. BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
-#    new local model. Test the new local model, then repeat from step 2.
 
 
 def test(data):
@@ -435,26 +415,25 @@ async def calculate_acc_alpha(uuid, epochs):
     # update local cached global model for this epoch
     my_global_model_tensor = w_glob
 
-    # test different alpha
-    negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
-    negotiate_step_list = np.arange(hyperpara_min, hyperpara_max, negotiate_step)
+    # stable alpha is hyperpara
+    alpha = hyperpara
     alpha_list = []
     acc_test_list = []
     test_start_time = time.time()
-    for alpha in negotiate_step_list:
-        w_local2 = {}
-        for key in w_glob.keys():
-            w_local2[key] = alpha * my_local_model_tensor[key] + (1 - alpha) * w_glob[key]
+    w_local2 = {}
+    for key in w_glob.keys():
+        w_local2[key] = alpha * my_local_model_tensor[key] + (1 - alpha) * w_glob[key]
 
-        # change parameters to model
-        net_glob.load_state_dict(w_local2)
-        net_glob.eval()
-        # test the accuracy
-        idx = int(uuid) - 1
-        acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
-        alpha_list.append(alpha)
-        acc_test_list.append(acc_test.numpy().item(0))
-        print("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
+    # change parameters to model
+    net_glob.load_state_dict(w_local2)
+    net_glob.eval()
+    # test the accuracy
+    idx = int(uuid) - 1
+    acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
+    alpha_list.append(alpha)
+    acc_test_list.append(acc_test.numpy().item(0))
+    print("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
+
     test_time = time.time() - test_start_time
 
     # upload acc-alpha map to committee leader and the ledger
@@ -467,7 +446,7 @@ async def calculate_acc_alpha(uuid, epochs):
         'uuid': uuid,
         'epochs': epochs,
     }
-    print('negotiate finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
+    print('calculate acc-alpha map finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
     await http_client_post(blockchain_server_url, body_data)
     trigger_data = {
         'message': 'acc_alpha_map_ready',

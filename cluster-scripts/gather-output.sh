@@ -8,6 +8,6 @@ mkdir -p output/
 for i in "${!PeerAddress[@]}"; do
   addrIN=(${PeerAddress[i]//:/ })
   
-  scp ${HostUser}@${addrIN[0]}:~/EASC/federated-learning-master/result-record_*.txt output/
+  scp ${HostUser}@${addrIN[0]}:~/EASC/federated-learning/result-record_*.txt output/
 done
 

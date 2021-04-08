@@ -165,10 +165,10 @@ function networkUp() {
 }
 
 function cleanLogs() {
-  rm -f ~/EASC/federated-learning-master/result-record_*.txt
+  rm -f ~/EASC/federated-learning/result-record_*.txt
   for i in "${!PeerAddress[@]}"; do
     addrIN=(${PeerAddress[i]//:/ })
-    ssh ${HostUser}@${addrIN[0]} "rm -f ~/EASC/federated-learning-master/result-record_*.txt"
+    ssh ${HostUser}@${addrIN[0]} "rm -f ~/EASC/federated-learning/result-record_*.txt"
   done
 }
 
