@@ -57,6 +57,8 @@ npm install
 
 ### Federated Learning
 
+Require matplotlib (>=3.3.1), numpy (>=1.18.5), torch (>=1.7.1) torchvision (>=0.8.2) tornado (>=6.1) and sklearn.
+
 ```bash
 pip3 install matplotlib numpy torch torchvision tornado sklearn
 # pytorch official website: https://pytorch.org/get-started/locally/

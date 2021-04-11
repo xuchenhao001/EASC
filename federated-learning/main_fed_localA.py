@@ -40,6 +40,7 @@ fed_listen_port = 8888
 
 # NOT TO TOUCH VARIABLES BELOW
 trigger_url = ""
+peer_address_list = []
 g_user_id = 0
 lock = threading.Lock()
 wMap = {}
@@ -75,7 +76,6 @@ def env_from_sourcing(file_to_source_path, variable_name):
 
 
 async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
-    global trigger_url
     global net_glob
     global args
     global dataset_train
@@ -94,24 +94,20 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
     args = args_parser()
     args.device = torch.device('cpu')
 
-    # parse network.config and read the peer addresses
-    real_path = os.path.dirname(os.path.realpath(__file__))
-    peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
-    peer_address_list = peerAddressVar.split(' ')
-    peerHeaderAddr = peer_address_list[0].split(":")[0]
-    trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
     # parse participant number
     args.num_users = len(peer_address_list)
 
     # the first time to train, init net_glob
     if epochs is None:
         epochs = args.epochs
+        real_path = os.path.dirname(os.path.realpath(__file__))
+        mnist_data_path = os.path.join(real_path, "../data/mnist/")
 
         # load dataset and split users
         if args.dataset == 'mnist':
             trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-            dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
-            dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+            dataset_train = datasets.MNIST(mnist_data_path, train=True, download=True, transform=trans_mnist)
+            dataset_test = datasets.MNIST(mnist_data_path, train=False, download=True, transform=trans_mnist)
             # sample users
             if args.iid:
                 dict_users = mnist_iid(dataset_train, args.num_users)
@@ -121,8 +117,9 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         elif args.dataset == 'cifar':
             trans_cifar = transforms.Compose(
                 [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-            dataset_train = datasets.CIFAR10('../data/cifar', train=True, download=True, transform=trans_cifar)
-            dataset_test = datasets.CIFAR10('../data/cifar', train=False, download=True, transform=trans_cifar)
+            cifar_data_path = os.path.join(real_path, "../data/cifar/")
+            dataset_train = datasets.CIFAR10(cifar_data_path, train=True, download=True, transform=trans_cifar)
+            dataset_test = datasets.CIFAR10(cifar_data_path, train=False, download=True, transform=trans_cifar)
             if args.iid:
                 dict_users = cifar_iid(dataset_train, args.num_users)
             else:
@@ -326,7 +323,7 @@ async def release_global_w(epochs):
             'start_time': start_time,
         }
         json_body = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-        my_url = "http://" + ipMap[user_id] + ":8181/messages"
+        my_url = "http://" + ipMap[user_id] + ":" + str(fed_listen_port) + "/trigger"
         asyncio.ensure_future(http_client_post(my_url, json_body, 'release_global_w'))
 
 
@@ -415,7 +412,7 @@ class MainHandler(web.RequestHandler):
 
 def make_app():
     return web.Application([
-        (r"/messages", MainHandler),
+        (r"/trigger", MainHandler),
     ])
 
 
@@ -425,6 +422,7 @@ async def fetch_user_id():
     }
     json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
     response = await http_client_post(trigger_url, json_body, 'fetch_user_id')
+    print(response)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     user_id = detail.get("user_id")
@@ -482,12 +480,25 @@ def get_ip():
     return IP
 
 
-if __name__ == "__main__":
+def main():
+    global peer_address_list
+    global trigger_url
+
+    # parse network.config and read the peer addresses
+    real_path = os.path.dirname(os.path.realpath(__file__))
+    peer_address_var = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
+    peer_address_list = peer_address_var.split(' ')
+    peer_addrs = [peer_addr.split(":")[0] for peer_addr in peer_address_list]
+    peer_header_addr = peer_addrs[0]
+    trigger_url = "http://" + peer_header_addr + ":" + str(fed_listen_port) + "/trigger"
+
     # multi-thread training here
+    my_ip = get_ip()
     threads = []
-    for i in range(thread_num):
-        thread_train = MultiTrainThread(None, None, None, None, None, None, None)
-        threads.append(thread_train)
+    for addr in peer_addrs:
+        if addr == my_ip:
+            thread_train = MultiTrainThread(None, None, None, None, None, None, None)
+            threads.append(thread_train)
 
     # Start all threads
     for thread in threads:
@@ -501,3 +512,8 @@ if __name__ == "__main__":
     app.listen(fed_listen_port)
     print("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()
+
+
+if __name__ == "__main__":
+    main()
+
