@@ -30,8 +30,6 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 # TO BE CHANGED
-# how many threads on a node
-thread_num = 1
 # wait in seconds for other nodes to start
 start_wait_time = 15
 # federated learning server listen port
@@ -90,6 +88,7 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
     global differenc2
     if user_id is None:
         user_id = await fetch_user_id()
+
     # parse args
     args = args_parser()
     args.device = torch.device('cpu')
@@ -101,10 +100,10 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
     if epochs is None:
         epochs = args.epochs
         real_path = os.path.dirname(os.path.realpath(__file__))
-        mnist_data_path = os.path.join(real_path, "../data/mnist/")
 
         # load dataset and split users
         if args.dataset == 'mnist':
+            mnist_data_path = os.path.join(real_path, "../data/mnist/")
             trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
             dataset_train = datasets.MNIST(mnist_data_path, train=True, download=True, transform=trans_mnist)
             dataset_test = datasets.MNIST(mnist_data_path, train=False, download=True, transform=trans_mnist)
