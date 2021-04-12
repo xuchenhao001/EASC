@@ -62,3 +62,28 @@ class CNNCifar(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return F.log_softmax(x, dim=1)
+
+
+class UCI_CNN(nn.Module):
+    def __init__(self):
+        super(UCI_CNN, self).__init__()
+        self.conv_layer = nn.Sequential(
+            nn.Conv1d(6, 196, 15, stride=1, padding=15 // 2),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=4, stride=4, padding=0),
+            # nn.Conv1d(196, 392, 15, stride=1, padding= 15 // 2),
+            # nn.ReLU(),
+            # nn.MaxPool1d(kernel_size=4, stride=4, padding=0),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(6272, 1024),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 6)
+        )
+
+    def forward(self, x):
+        x = self.conv_layer(x)
+        x = x.reshape(x.size(0), -1)
+        out = self.fc(x)
+        return out
