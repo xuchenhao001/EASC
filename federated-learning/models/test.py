@@ -9,16 +9,18 @@ from torch.utils.data import DataLoader
 from models.Update import DatasetSplit
 
 
-def test_img(net_g, datatest, test_indices, args):
+def test_img(net_g, dataset_test, test_indices, args):
     net_g.eval()
     # testing
     test_loss = 0
     correct = 0
-    data_loader = DataLoader(DatasetSplit(datatest, test_indices), batch_size=args.bs)
+    dataset = DatasetSplit(dataset_test, test_indices)
+    data_loader = DataLoader(dataset, batch_size=args.bs)
     l = len(data_loader)
     for idx, (data, target) in enumerate(data_loader):
+        data = torch.tensor(data).type(torch.FloatTensor)
         if args.gpu != -1:
-            data, target = data.cuda(args.device), target.cuda(args.device)
+            data, target = data.to(args.device), target.to(args.device)
         log_probs = net_g(data)
         # sum up batch loss
         test_loss += F.cross_entropy(log_probs, target, reduction='sum').item()
@@ -31,7 +33,7 @@ def test_img(net_g, datatest, test_indices, args):
     if args.verbose:
         print('\nTest set: Average loss: {:.4f} \nAccuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, correct, len(data_loader.dataset), accuracy))
-    return accuracy, test_loss
+    return correct, test_loss
 
 
 def test_img_total(net_g, dataset_test, idx_list, args):

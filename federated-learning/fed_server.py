@@ -11,26 +11,24 @@ import math
 import os
 import random
 import time
-import socket
-import statistics
 import subprocess
-
-matplotlib.use('Agg')
 import copy
 import numpy as np
 import threading
-from threading import Thread
-from torchvision import datasets, transforms
 import torch
+from torchvision import datasets, transforms
 
+from datasets.UCI import UCIDataset
+from datasets.REALWORLD import REALWORLDDataset
 from utils.sampling import mnist_iid, cifar_iid, noniid_onepass
 from utils.options import args_parser
 from models.Update import LocalUpdate
-from models.Nets import MLP, CNNMnist, CNNCifar
+from models.Nets import MLP, CNNMnist, CNNCifar, UCI_CNN
 from models.Fed import FedAvg
 from models.test import test_img, test_img_total
-
 from tornado import httpclient, ioloop, web, gen
+
+matplotlib.use('Agg')
 
 np.random.seed(0)
 torch.random.manual_seed(0)
@@ -53,23 +51,15 @@ fed_listen_port = 8888
 # NOT TO TOUCH VARIABLES BELOW
 blockchain_server_url = ""
 trigger_url = ""
-# blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
-# trigger_url = "http://localhost:8888/trigger"
 total_epochs = 0  # epochs must be an integer
 args = None
 net_glob = None
 dataset_train = None
 dataset_test = None
-dict_users = None
-idxs_users = None
+dict_users = []
 lock = threading.Lock()
-train_users = None
-test_users = None
-skew_users1 = None
-skew_users2 = None
-skew_users3 = None
-skew_users4 = None
-poll_count_num = 0
+test_users = []
+skew_users = []
 negotiate_count_num = 0
 next_round_count_num = 0
 peer_address_list = []
@@ -146,12 +136,8 @@ def init():
     global dataset_test
     global dict_users
     global idxs_users
-    global train_users
     global test_users
-    global skew_users1
-    global skew_users2
-    global skew_users3
-    global skew_users4
+    global skew_users
     global blockchain_server_url
     global trigger_url
     global peer_address_list
@@ -184,9 +170,7 @@ def init():
             # dict_users = mnist_iid(dataset_train, 1)
             dict_users = mnist_iid(dataset_train, args.num_users)
         else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
-                                                                                                        dataset_test,
-                                                                                                        args.num_users)
+            dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, args.num_users)
     elif args.dataset == 'cifar':
         trans_cifar = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -197,22 +181,37 @@ def init():
             # dict_users = cifar_iid(dataset_train, 1)
             dict_users = cifar_iid(dataset_train, args.num_users)
         else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
-                                                                                                        dataset_test,
-                                                                                                        args.num_users)
+            dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, args.num_users)
             # exit('Error: only consider IID setting in CIFAR10')
+    elif args.dataset == 'uci':
+        uci_data_path = os.path.join(real_path, "../data/uci/")
+        dataset_train = UCIDataset(data_path=uci_data_path, phase='train')
+        dataset_test = UCIDataset(data_path=uci_data_path, phase='eval')
+        if args.iid:
+            dict_users = cifar_iid(dataset_train, args.num_users)
+        else:
+            dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, args.num_users,
+                                                                dataset_name='uci')
+    elif args.dataset == 'realworld':
+        realworld_data_path = os.path.join(real_path, "../data/realworld_client/")
+        dataset_train = REALWORLDDataset(data_path=realworld_data_path, phase='train')
+        dataset_test = REALWORLDDataset(data_path=realworld_data_path, phase='eval')
+        if args.iid:
+            dict_users = cifar_iid(dataset_train, args.num_users)
+        else:
+            dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, args.num_users,
+                                                                dataset_name='uci')
     else:
         exit('Error: unrecognized dataset')
     img_size = dataset_train[0][0].shape
-
-    m = max(int(args.frac * args.num_users), 1)
-    idxs_users = np.random.choice(range(args.num_users), m, replace=False)
 
     # build model, init part
     if args.model == 'cnn' and args.dataset == 'cifar':
         net_glob = CNNCifar(args=args).to(args.device)
     elif args.model == 'cnn' and args.dataset == 'mnist':
         net_glob = CNNMnist(args=args).to(args.device)
+    elif args.model == 'cnn' and (args.dataset == 'uci' or args.dataset == 'realworld'):
+        net_glob = UCI_CNN().to(args.device)
     elif args.model == 'mlp':
         len_in = 1
         for x in img_size:
@@ -537,17 +536,17 @@ async def round_finish(data, uuid, epochs):
     net_glob.eval()
     test_addition_start_time = time.time()
     idx = int(uuid) - 1
-    idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+    idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
     correct = test_img_total(net_glob, dataset_test, idx_total, args)
     acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
     # skew 5%
-    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
+    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users[0][idx])))
     # skew 10%
-    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
+    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users[1][idx])))
     # skew 15%
-    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
+    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users[2][idx])))
     # skew 20%
-    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
+    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users[3][idx])))
     test_addition_time = time.time() - test_addition_start_time
     test_time += test_addition_time
 
@@ -588,7 +587,6 @@ async def round_finish(data, uuid, epochs):
 # count for STEP #7 the next round requests gathered
 async def next_round_count(epochs):
     global train_count_num
-    global poll_count_num
     global negotiate_count_num
     global next_round_count_num
     lock.acquire()
@@ -598,7 +596,6 @@ async def next_round_count(epochs):
         # reset counts
         lock.acquire()
         train_count_num = 0
-        poll_count_num = 0
         negotiate_count_num = 0
         next_round_count_num = 0
         lock.release()

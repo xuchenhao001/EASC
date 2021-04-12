@@ -36,7 +36,7 @@ class UCIDataset(Dataset):
 
 if __name__ == '__main__':
     real_path = os.path.dirname(os.path.realpath(__file__))
-    uci_data_path = os.path.join(real_path, "../../data/UCI/")
+    uci_data_path = os.path.join(real_path, "../../data/uci/")
     device = torch.device('cpu')
     dataset = UCIDataset(uci_data_path)
     dataloader = DataLoader(dataset, batch_size=100, shuffle=True)

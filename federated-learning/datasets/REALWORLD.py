@@ -59,7 +59,7 @@ class REALWORLDDataset(Dataset):
 
 if __name__ == '__main__':
     real_path = os.path.dirname(os.path.realpath(__file__))
-    realworld_client_data_path = os.path.join(real_path, "../../data/REALWORLD_CLIENT/")
+    realworld_client_data_path = os.path.join(real_path, "../../data/realworld_client/")
     dataset = REALWORLDDataset(data_path=realworld_client_data_path)
     print(dataset[0][0].shape, dataset[0][1])
     print(len(dataset))
