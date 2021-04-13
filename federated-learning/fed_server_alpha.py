@@ -6,31 +6,27 @@ import base64
 import gzip
 import hashlib
 import json
-import matplotlib
+import logging
 import math
 import os
 import random
+import sys
 import time
-import socket
-import statistics
 import subprocess
-
-matplotlib.use('Agg')
 import copy
 import numpy as np
 import threading
-from threading import Thread
-from torchvision import datasets, transforms
 import torch
+from tornado import httpclient, ioloop, web, gen
 
-from utils.sampling import mnist_iid, cifar_iid, noniid_onepass
 from utils.options import args_parser
 from models.Update import LocalUpdate
-from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img, test_img_total
+from utils.util import dataset_loader, model_loader
 
-from tornado import httpclient, ioloop, web, gen
+logging.basicConfig(format='%(asctime)s %(message)s')
+logger = logging.getLogger("fed_server_alpha")
 
 np.random.seed(0)
 torch.random.manual_seed(0)
@@ -51,23 +47,15 @@ fed_listen_port = 8888
 # NOT TO TOUCH VARIABLES BELOW
 blockchain_server_url = ""
 trigger_url = ""
-# blockchain_server_url = "http://localhost:3000/invoke/mychannel/fabcar"
-# trigger_url = "http://localhost:8888/trigger"
 total_epochs = 0  # epochs must be an integer
 args = None
 net_glob = None
 dataset_train = None
 dataset_test = None
-dict_users = None
-idxs_users = None
+dict_users = []
 lock = threading.Lock()
-train_users = None
-test_users = None
-skew_users1 = None
-skew_users2 = None
-skew_users3 = None
-skew_users4 = None
-poll_count_num = 0
+test_users = []
+skew_users = []
 negotiate_count_num = 0
 next_round_count_num = 0
 peer_address_list = []
@@ -93,7 +81,6 @@ def test(data):
 # returns variable from sourcing a file
 def env_from_sourcing(file_to_source_path, variable_name):
     source = 'source %s && export MYVAR=$(echo "${%s[@]}")' % (file_to_source_path, variable_name)
-    # dump = '/usr/bin/python3 -c "import os, json; print(json.dumps(dict(os.getenv(\'MYVAR\'))))"'
     dump = '/usr/bin/python3 -c "import os, json; print(os.getenv(\'MYVAR\'))"'
     pipe = subprocess.Popen(['/bin/bash', '-c', '%s && %s' % (source, dump)], stdout=subprocess.PIPE)
     # return json.loads(pipe.stdout.read())
@@ -102,7 +89,7 @@ def env_from_sourcing(file_to_source_path, variable_name):
 
 async def http_client_post(url, body_data):
     json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    print("Start http client post [" + body_data['message'] + "] to: " + url)
+    logger.debug("Start http client post [" + body_data['message'] + "] to: " + url)
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
@@ -110,10 +97,10 @@ async def http_client_post(url, body_data):
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
-        print("[HTTP Success] [" + body_data['message'] + "] from " + url)
+        logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
         return response.body
     except Exception as e:
-        print("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
+        logger.error("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
         return None
 
 
@@ -125,13 +112,8 @@ def init():
     global dataset_train
     global dataset_test
     global dict_users
-    global idxs_users
-    global train_users
     global test_users
-    global skew_users1
-    global skew_users2
-    global skew_users3
-    global skew_users4
+    global skew_users
     global blockchain_server_url
     global trigger_url
     global peer_address_list
@@ -150,56 +132,21 @@ def init():
     args = args_parser()
     args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
     total_epochs = args.epochs
+    logger.setLevel(args.log_level)
     # parse participant number
     args.num_users = len(peer_address_list)
 
-    # load dataset and split users
-    if args.dataset == 'mnist':
-        trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-        mnist_data_path = os.path.join(real_path, "../data/mnist/")
-        dataset_train = datasets.MNIST(mnist_data_path, train=True, download=True, transform=trans_mnist)
-        dataset_test = datasets.MNIST(mnist_data_path, train=False, download=True, transform=trans_mnist)
-        # sample users
-        if args.iid:
-            # dict_users = mnist_iid(dataset_train, 1)
-            dict_users = mnist_iid(dataset_train, args.num_users)
-        else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
-                                                                                                        dataset_test,
-                                                                                                        args.num_users)
-    elif args.dataset == 'cifar':
-        trans_cifar = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        cifar_data_path = os.path.join(real_path, "../data/cifar/")
-        dataset_train = datasets.CIFAR10(cifar_data_path, train=True, download=True, transform=trans_cifar)
-        dataset_test = datasets.CIFAR10(cifar_data_path, train=False, download=True, transform=trans_cifar)
-        if args.iid:
-            # dict_users = cifar_iid(dataset_train, 1)
-            dict_users = cifar_iid(dataset_train, args.num_users)
-        else:
-            dict_users, test_users, skew_users1, skew_users2, skew_users3, skew_users4 = noniid_onepass(dataset_train,
-                                                                                                        dataset_test,
-                                                                                                        args.num_users)
-            # exit('Error: only consider IID setting in CIFAR10')
-    else:
-        exit('Error: unrecognized dataset')
+    dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
+                                                                                     args.num_users)
+    if dict_users is None:
+        logger.error('Error: unrecognized dataset')
+        sys.exit()
+
     img_size = dataset_train[0][0].shape
-
-    m = max(int(args.frac * args.num_users), 1)
-    idxs_users = np.random.choice(range(args.num_users), m, replace=False)
-
-    # build model, init part
-    if args.model == 'cnn' and args.dataset == 'cifar':
-        net_glob = CNNCifar(args=args).to(args.device)
-    elif args.model == 'cnn' and args.dataset == 'mnist':
-        net_glob = CNNMnist(args=args).to(args.device)
-    elif args.model == 'mlp':
-        len_in = 1
-        for x in img_size:
-            len_in *= x
-        net_glob = MLP(dim_in=len_in, dim_hidden=64, dim_out=args.num_classes).to(args.device)
-    else:
-        exit('Error: unrecognized model')
+    net_glob = model_loader(args.model, args.dataset, args.device, args.num_channels, args.num_classes, img_size)
+    if net_glob is None:
+        logger.error('Error: unrecognized model')
+        sys.exit()
     # finally trained the initial local model, which will be treated as first global model.
     net_glob.train()
     # generate md5 hash from model, which is treated as global model of previous round.
@@ -230,18 +177,18 @@ async def start():
 async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
     global trigger_url
-    print("######################\nEpoch #", epochs, " start now\n######################")
+    logger.info("###################### Epoch #" + str(epochs) + " start now ######################")
 
-    print('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
+    logger.debug('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
     # if need, re-elect the committee members
     if do_elect:
-        print('[RAFT] Received elect request! Kill the old raft processes and elect new committee members!')
+        logger.debug('[RAFT] Received elect request! Kill the old raft processes and elect new committee members!')
         kill_local_raft_proc()
-        print('[RAFT] Current global model hash: ' + global_model_hash)
+        logger.debug('[RAFT] Current global model hash: ' + global_model_hash)
         committee_leader_id = int(global_model_hash, 16) % args.num_users + 1
         committee_proportion_num = math.ceil(args.num_users * committee_proportion)  # committee id delta value
         committee_highest_id = committee_proportion_num + committee_leader_id - 1
-        print('[RAFT] The leader id is: %s' % str(committee_leader_id))
+        logger.debug('[RAFT] The leader id is: %s' % str(committee_leader_id))
         # update trigger url based on committee leader (to accept the global model or local models)
         trigger_ip = peer_address_list[int(committee_leader_id) - 1].split(":")[0]
         trigger_url = "http://" + trigger_ip + ":" + str(fed_listen_port) + "/trigger"
@@ -251,7 +198,7 @@ async def prepare_committee(uuid, epochs, do_elect):
             rounded_committee_highest_id = committee_highest_id % args.num_users
         if committee_leader_id <= int(uuid) <= committee_highest_id or \
                 1 <= int(uuid) <= rounded_committee_highest_id:
-            print("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
+            logger.debug("[RAFT] # BOOT LOCAL RAFT PROCESS! #")
             http_addr, raft_addr = generate_raft_addr_info(uuid)
             boot_local_raft_proc(uuid, http_addr, raft_addr)
         # wait for a while in case raft processes on some nodes are not running.
@@ -261,13 +208,13 @@ async def prepare_committee(uuid, epochs, do_elect):
 
         # if this node is elected as committee leader, boot the raft network.
         if int(uuid) == committee_leader_id:
-            print("[RAFT] Match the leader ID: " + uuid)
-            print("[RAFT] # BOOT RAFT CONSENSUS NETWORK! #")
+            logger.debug("[RAFT] Match the leader ID: " + uuid)
+            logger.debug("[RAFT] # BOOT RAFT CONSENSUS NETWORK! #")
             client_addrs = []
             client_raft_addrs = []
             client_ids = []
             # i starts from the leader id and end at committee highest id
-            print("[RAFT] committee_highest_id: " + str(committee_highest_id))
+            logger.debug("[RAFT] committee_highest_id: " + str(committee_highest_id))
             for i in range(int(uuid) + 1, committee_highest_id + 1):
                 if i > args.num_users:
                     index = i % args.num_users
@@ -309,7 +256,7 @@ async def prepare_committee(uuid, epochs, do_elect):
 # Federated Learning: train step
 async def train(uuid, epochs, start_time):
     global my_local_model_tensor
-    print('Train local model for user: %s, epoch: %s.' % (uuid, epochs))
+    logger.debug('Train local model for user: %s, epoch: %s.' % (uuid, epochs))
 
     idx = int(uuid) - 1
     local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
@@ -358,7 +305,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     global g_train_local_models
     global global_model_hash
     train_count_num += 1
-    print("Received a train_ready, now: " + str(train_count_num))
+    logger.debug("Received a train_ready, now: " + str(train_count_num))
     key = str(uuid) + "-" + str(epochs)
     g_start_time[key] = start_time
     g_train_time[key] = train_time
@@ -368,7 +315,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     g_train_local_models[epochs].append(conver_numpy_value_to_tensor(decompress_data(w_compressed)))
     lock.release()
     if train_count_num == args.num_users:
-        print("Gathered enough train_ready, aggregate global model and send the download link.")
+        logger.debug("Gathered enough train_ready, aggregate global model and send the download link.")
         # aggregate global model first
         w_glob = FedAvg(g_train_local_models[epochs])
         # save global model for further download (compressed)
@@ -376,7 +323,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
         g_train_global_models[epochs] = w_glob_compressed
         # generate hash of global model
         global_model_hash = generate_md5_hash(w_glob)
-        print("As a committee leader, calculate new global model hash: " + global_model_hash)
+        logger.debug("As a committee leader, calculate new global model hash: " + global_model_hash)
         # send the download link and hash of global model to the ledger
         body_data = {
             'message': 'GlobalModelUpdate',
@@ -386,7 +333,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
             'uuid': uuid,
             'epochs': epochs,
         }
-        print('aggregate global model finished, send global_model_hash [%s] to blockchain in epoch [%s].'
+        logger.debug('aggregate global model finished, send global_model_hash [%s] to blockchain in epoch [%s].'
               % (global_model_hash, epochs))
         await http_client_post(blockchain_server_url, body_data)
 
@@ -397,13 +344,13 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
 async def calculate_acc_alpha(uuid, epochs):
     global my_global_model_tensor
     global global_model_hash
-    print('Start calculate accuracy and alpha for user: %s, epoch: %s.' % (uuid, epochs))
+    logger.debug('Start calculate accuracy and alpha for user: %s, epoch: %s.' % (uuid, epochs))
     # download global model
     body_data = {
         'message': 'global_model',
         'epochs': epochs,
     }
-    print('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
+    logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
     result = await http_client_post(trigger_url, body_data)
     responseObj = json.loads(result)
     detail = responseObj.get("detail")
@@ -411,7 +358,7 @@ async def calculate_acc_alpha(uuid, epochs):
     w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
     # load hash of new global model, which is downloaded from the leader
     global_model_hash = generate_md5_hash(w_glob)
-    print("As a follower, received new global model with hash: " + global_model_hash)
+    logger.debug("As a follower, received new global model with hash: " + global_model_hash)
     # update local cached global model for this epoch
     my_global_model_tensor = w_glob
 
@@ -432,7 +379,7 @@ async def calculate_acc_alpha(uuid, epochs):
     acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
     alpha_list.append(alpha)
     acc_test_list.append(acc_test.numpy().item(0))
-    print("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
+    logger.debug("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
 
     test_time = time.time() - test_start_time
 
@@ -446,7 +393,7 @@ async def calculate_acc_alpha(uuid, epochs):
         'uuid': uuid,
         'epochs': epochs,
     }
-    print('calculate acc-alpha map finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
+    logger.debug('calculate acc-alpha map finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
     await http_client_post(blockchain_server_url, body_data)
     trigger_data = {
         'message': 'acc_alpha_map_ready',
@@ -489,7 +436,7 @@ async def acc_alpha_map_count(epochs, uuid, test_time):
 # BC-nodes-python get the appropriate alpha, merge the local model and the global model with alpha to generate the
 # new local model. Test the new local model, then repeat from step 2.
 async def round_finish(data, uuid, epochs):
-    print('Received best alpha, train new w_local for user: %s, epoch: %s.' % (uuid, epochs))
+    logger.debug('Received best alpha, train new w_local for user: %s, epoch: %s.' % (uuid, epochs))
     alpha = data.get("alpha")
     # calculate new w_glob (w_local2) according to the alpha
     w_local2 = {}
@@ -516,17 +463,17 @@ async def round_finish(data, uuid, epochs):
     net_glob.eval()
     test_addition_start_time = time.time()
     idx = int(uuid) - 1
-    idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+    idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
     correct = test_img_total(net_glob, dataset_test, idx_total, args)
     acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
     # skew 5%
-    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
+    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users[0][idx])))
     # skew 10%
-    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
+    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users[1][idx])))
     # skew 15%
-    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
+    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users[2][idx])))
     # skew 20%
-    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
+    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users[3][idx])))
     test_addition_time = time.time() - test_addition_start_time
     test_time += test_addition_time
 
@@ -561,13 +508,12 @@ async def round_finish(data, uuid, epochs):
         }
         await http_client_post(trigger_url, body_data)
     else:
-        print("##########\nALL DONE!\n##########")
+        logger.info("########## ALL DONE! ##########")
 
 
 # count for STEP #7 the next round requests gathered
 async def next_round_count(epochs):
     global train_count_num
-    global poll_count_num
     global negotiate_count_num
     global next_round_count_num
     lock.acquire()
@@ -577,14 +523,13 @@ async def next_round_count(epochs):
         # reset counts
         lock.acquire()
         train_count_num = 0
-        poll_count_num = 0
         negotiate_count_num = 0
         next_round_count_num = 0
         lock.release()
         # trigger next round's committee election
         do_elect = True
         # sleep 20 seconds before trigger next round
-        print("SLEEP FOR A WHILE...")
+        logger.info("SLEEP FOR A WHILE...")
         await gen.sleep(20)
         # START NEXT ROUND
         body_data = {
@@ -626,11 +571,11 @@ def boot_local_raft_proc(uuid, http_addr, raft_addr):
 def kill_local_raft_proc():
     global raft_subprocess
     if raft_subprocess is not None:
-        print("[RAFT] Found raft subprocess. Kill it now.")
+        logger.debug("[RAFT] Found raft subprocess. Kill it now.")
         raft_subprocess.kill()
         raft_subprocess = None
     else:
-        print("[RAFT] Didn't find raft subprocess. Do not kill.")
+        logger.debug("[RAFT] Didn't find raft subprocess. Do not kill.")
 
 
 # generate raft address info from uuid
@@ -646,7 +591,7 @@ def generate_raft_addr_info(uuid):
 
 # generate raft address from peer address
 def generate_raft_addr(peer_addr):
-    print('generate peer addr for: ' + peer_addr)
+    logger.debug('generate peer addr for: ' + peer_addr)
     ip = peer_addr.split(":")[0]
     port = peer_addr.split(":")[1]
     http_port = str(int(port) + 100)  # raft http port is (100 + peer port)
@@ -786,5 +731,5 @@ if __name__ == "__main__":
     init()
     app = make_app()
     app.listen(fed_listen_port)
-    print("start serving at " + str(fed_listen_port) + "...")
+    logger.info("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()

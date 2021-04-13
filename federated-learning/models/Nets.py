@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 
-import torch
 from torch import nn
 import torch.nn.functional as F
 
@@ -26,13 +25,13 @@ class MLP(nn.Module):
 
 
 class CNNMnist(nn.Module):
-    def __init__(self, args):
+    def __init__(self, num_channels, num_classes):
         super(CNNMnist, self).__init__()
-        self.conv1 = nn.Conv2d(args.num_channels, 10, kernel_size=5)
+        self.conv1 = nn.Conv2d(num_channels, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
         self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, args.num_classes)
+        self.fc2 = nn.Linear(50, num_classes)
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
@@ -45,14 +44,14 @@ class CNNMnist(nn.Module):
 
 
 class CNNCifar(nn.Module):
-    def __init__(self, args):
+    def __init__(self, num_classes):
         super(CNNCifar, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, args.num_classes)
+        self.fc3 = nn.Linear(84, num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
@@ -65,8 +64,9 @@ class CNNCifar(nn.Module):
 
 
 class UCI_CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, n_class=6):
         super(UCI_CNN, self).__init__()
+        self.n_class = n_class
         self.conv_layer = nn.Sequential(
             nn.Conv1d(6, 196, 15, stride=1, padding=15 // 2),
             nn.ReLU(),
@@ -79,7 +79,7 @@ class UCI_CNN(nn.Module):
             nn.Linear(6272, 1024),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(1024, 6)
+            nn.Linear(1024, self.n_class)
         )
 
     def forward(self, x):

@@ -6,13 +6,13 @@ from torch.utils.data import Dataset
 import numpy as np
 import hickle as hkl
 
+
 class REALWORLDDataset(Dataset):
     def __init__(self, data_path, phase="train"):
 
         self.data_path = data_path
         self.phase = phase
         self.data, self.targets = self.get_data()
-
 
     def get_data(self):
         clientLabel = []
@@ -30,7 +30,7 @@ class REALWORLDDataset(Dataset):
 
         data = []
         label = []
-        for i in range (0,15):
+        for i in range(0, 15):
             kf = KFold(n_splits=5, shuffle=True, random_state=42)
             kf.get_n_splits(clientData[i])
             partitionedData = list()
@@ -56,6 +56,7 @@ class REALWORLDDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx], self.targets[idx]
+
 
 if __name__ == '__main__':
     real_path = os.path.dirname(os.path.realpath(__file__))

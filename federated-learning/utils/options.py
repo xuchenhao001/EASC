@@ -38,5 +38,7 @@ def args_parser():
     parser.add_argument('--stopping_rounds', type=int, default=10, help='rounds of early stopping')
     parser.add_argument('--verbose', action='store_true', help='verbose print')
     parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
+    parser.add_argument('--log_level', type=str, default='DEBUG', help='level of logs: DEBUG, INFO, WARNING, ERROR, '
+                                                                       'or CRITICAL')
     args = parser.parse_args()
     return args

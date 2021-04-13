@@ -58,39 +58,57 @@ def get_indices(labels, user_labels, n_samples):
         indices += selected_indices
     return indices
 
+
 def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist', kept_class=3):
     train_users = {}
     test_users = {}
-    skew_users = {}
+    skew_users1 = {}
+    skew_users2 = {}
+    skew_users3 = {}
+    skew_users4 = {}
+
+    skew1_pct = 0.05
+    skew2_pct = 0.10
+    skew3_pct = 0.15
+    skew4_pct = 0.20
 
     train_idxs = np.arange(len(dataset_train))
     train_labels = dataset_train.targets
     train_labels = np.vstack((train_idxs, train_labels))
-    # train_labels = train_labels[:, train_labels[1,:].argsort()]
 
     test_idxs = np.arange(len(dataset_test))
     test_labels = dataset_test.targets
     test_labels = np.vstack((test_idxs, test_labels))
-    # test_labels = test_labels[:, test_labels[1,:].argsort()]
-    if dataset_name == 'mnist' or dataset_name == 'cifar':
+    if dataset_name == 'mnist':
         labels = list(range(10))
-        samples = [150, 50, 20]
+        samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
+    elif dataset_name == 'cifar':
+        labels = list(range(10))
+        samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
     elif dataset_name == 'uci':
         labels = list(range(6))
-        samples = [500, 200, 100]
+        samples = [500, 200, int(200*skew1_pct), int(200*skew2_pct), int(200*skew3_pct), int(200*skew4_pct)]
     elif dataset_name == 'realworld':
         labels = list(range(8))
-        samples = [5000, 1000, 1000]
+        samples = [5000, 1000, int(1000*skew1_pct), int(1000*skew2_pct), int(1000*skew3_pct), int(1000*skew4_pct)]
     for i in range(num_users):
         user_labels = np.random.choice(labels, size=kept_class, replace=False)
         skew_labels = [i for i in labels if i not in user_labels]
         train_indices = get_indices(train_labels, user_labels, n_samples=samples[0])
         test_indices = get_indices(test_labels, user_labels, n_samples=samples[1])
-        skew_indices = get_indices(test_labels, skew_labels, n_samples=samples[2])
+
+        skew1_indices = get_indices(test_labels, skew_labels, n_samples=samples[2])
+        skew2_indices = get_indices(test_labels, skew_labels, n_samples=samples[3])
+        skew3_indices = get_indices(test_labels, skew_labels, n_samples=samples[4])
+        skew4_indices = get_indices(test_labels, skew_labels, n_samples=samples[5])
+
         train_users[i] = train_indices
         test_users[i] = test_indices
-        skew_users[i] = skew_indices
-    return train_users, test_users, skew_users
+        skew_users1[i] = skew1_indices
+        skew_users2[i] = skew2_indices
+        skew_users3[i] = skew3_indices
+        skew_users4[i] = skew4_indices
+    return train_users, test_users, (skew_users1, skew_users2, skew_users3, skew_users4)
 
 
 def cifar_iid(dataset, num_users):

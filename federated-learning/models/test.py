@@ -16,7 +16,6 @@ def test_img(net_g, dataset_test, test_indices, args):
     correct = 0
     dataset = DatasetSplit(dataset_test, test_indices)
     data_loader = DataLoader(dataset, batch_size=args.bs)
-    l = len(data_loader)
     for idx, (data, target) in enumerate(data_loader):
         data = torch.tensor(data).type(torch.FloatTensor)
         if args.gpu != -1:
@@ -33,7 +32,7 @@ def test_img(net_g, dataset_test, test_indices, args):
     if args.verbose:
         print('\nTest set: Average loss: {:.4f} \nAccuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, correct, len(data_loader.dataset), accuracy))
-    return correct, test_loss
+    return accuracy, test_loss
 
 
 def test_img_total(net_g, dataset_test, idx_list, args):
@@ -53,6 +52,7 @@ def test_img_total(net_g, dataset_test, idx_list, args):
     y_target = []
     y_pred = []
     for idx, (data, target) in enumerate(data_loader):
+        data = torch.tensor(data).type(torch.FloatTensor)
         if args.gpu != -1:
             data, target = data.to(args.device), target.to(args.device)
         log_probs = net_g(data)
