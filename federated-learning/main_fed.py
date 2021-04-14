@@ -85,7 +85,6 @@ def init():
 
 
 async def train(user_id, w_glob, start_time, epochs):
-    logger.info("#################### Epoch #" + str(epochs) + " start now ####################")
     if user_id is None:
         user_id = await fetch_user_id()
 
@@ -95,6 +94,8 @@ async def train(user_id, w_glob, start_time, epochs):
         # load w_glob as net_glob
         net_glob.load_state_dict(w_glob)
         net_glob.eval()
+
+    logger.info("#################### Epoch #" + str(epochs) + " start now ####################")
 
     # training
     train_start_time = time.time()
@@ -387,6 +388,9 @@ def main():
     # parse participant number
     args.num_users = len(peer_address_list)
 
+    # init dataset and global model
+    init()
+
     # multi-thread training here
     my_ip = get_ip()
     threads = []
@@ -395,8 +399,6 @@ def main():
             thread_train = MultiTrainThread()
             threads.append(thread_train)
 
-    # init dataset and global model
-    init()
     # Start all threads
     for thread in threads:
         thread.start()
