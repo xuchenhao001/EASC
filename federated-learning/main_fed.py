@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 import asyncio
+import base64
+import gzip
 import json
 import logging
 import os
@@ -19,9 +21,9 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Fed import FedAvg
 from models.test import test_img_total
-from utils.util import dataset_loader, model_loader
+from utils.util import dataset_loader, model_loader, ColoredLogger
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("main_fed")
 
 torch.manual_seed(0)
@@ -60,40 +62,35 @@ def env_from_sourcing(file_to_source_path, variable_name):
     return pipe.stdout.read().decode("utf-8").rstrip()
 
 
-async def train(user_id, w_glob, start_time, epochs):
+# init: loads the dataset and global model
+def init():
     global net_glob
-    global args
     global dataset_train
     global dataset_test
     global dict_users
     global test_users
     global skew_users
+
+    dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
+                                                                                         args.num_users)
+    if dict_users is None:
+        logger.error('Error: unrecognized dataset')
+        sys.exit()
+
+    img_size = dataset_train[0][0].shape
+    net_glob = model_loader(args.model, args.dataset, args.device, args.num_channels, args.num_classes, img_size)
+    if net_glob is None:
+        logger.error('Error: unrecognized model')
+        sys.exit()
+
+
+async def train(user_id, w_glob, start_time, epochs):
+    logger.info("#################### Epoch #" + str(epochs) + " start now ####################")
     if user_id is None:
         user_id = await fetch_user_id()
 
-    # parse args
-    args = args_parser()
-    args.device = torch.device('cpu')
-    logger.setLevel(args.log_level)
-
-    # parse participant number
-    args.num_users = len(peer_address_list)
-
-    # the first time to train, init net_glob
     if epochs is None:
         epochs = args.epochs
-
-        dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
-                                                                                         args.num_users)
-        if dict_users is None:
-            logger.error('Error: unrecognized dataset')
-            sys.exit()
-
-        img_size = dataset_train[0][0].shape
-        net_glob = model_loader(args.model, args.dataset, args.device, args.num_channels, args.num_classes, img_size)
-        if net_glob is None:
-            logger.error('Error: unrecognized model')
-            sys.exit()
     else:
         # load w_glob as net_glob
         net_glob.load_state_dict(w_glob)
@@ -109,7 +106,7 @@ async def train(user_id, w_glob, start_time, epochs):
 
 
 async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
-    conver_json_value_to_tensor(w_glob)
+    w_glob = conver_numpy_value_to_tensor(decompress_data(w_glob))
     net_glob.load_state_dict(w_glob)
     net_glob.eval()
 
@@ -155,7 +152,6 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     # start next round of train
     new_epochs = epochs - 1
     if new_epochs > 0:
-        logger.info("#################### Epoch #" + str(new_epochs) + " start now ####################")
         # reset a new time for next round
         asyncio.ensure_future(train(user_id, w_glob, time.time(), new_epochs))
     else:
@@ -194,7 +190,7 @@ async def release_global_w(epochs):
     g_user_id = 0
     lock.release()
     w_glob = FedAvg(wMap[epochs])
-    convert_tensor_value_to_numpy(w_glob)
+    w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
     for user_id in ipMap.keys():
         key = str(user_id) + "-" + str(epochs)
         start_time = g_start_time.get(key)
@@ -203,7 +199,7 @@ async def release_global_w(epochs):
             'message': 'release_global_w',
             'user_id': user_id,
             'epochs': epochs,
-            'w_glob': w_glob,
+            'w_glob': w_glob_compressed,
             'start_time': start_time,
             'train_time': train_time,
         }
@@ -224,7 +220,7 @@ async def average_local_w(user_id, epochs, w, from_ip, start_time, train_time):
     g_train_time[key] = train_time
 
     ipMap[user_id] = from_ip
-    conver_json_value_to_tensor(w)
+    w = conver_numpy_value_to_tensor(decompress_data(w))
     epochW = wMap.get(epochs)
     if epochW is None:
         wMap[epochs] = [w]
@@ -235,7 +231,6 @@ async def average_local_w(user_id, epochs, w, from_ip, start_time, train_time):
     if len(wMap[epochs]) == args.num_users:
         logger.debug("Gathered enough w, average and release them")
         asyncio.ensure_future(release_global_w(epochs))
-        # await release_global_w(epochs)
 
 
 async def http_client_post(url, json_body, message="None"):
@@ -252,6 +247,86 @@ async def http_client_post(url, json_body, message="None"):
     except Exception as e:
         logger.error("[HTTP Error] [" + message + "] SERVICE RESPONSE: %s" % e)
         return None
+
+
+async def fetch_user_id():
+    fetch_data = {
+        'message': 'fetch_user_id',
+    }
+    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
+    response = await http_client_post(trigger_url, json_body, 'fetch_user_id')
+    responseObj = json.loads(response)
+    detail = responseObj.get("detail")
+    user_id = detail.get("user_id")
+    return user_id
+
+
+async def upload_local_w(user_id, epochs, w, from_ip, start_time, train_time):
+    convert_tensor_value_to_numpy(w)
+    w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w))
+    upload_data = {
+        'message': 'upload_local_w',
+        'user_id': user_id,
+        'epochs': epochs,
+        'w': w_glob_compressed,
+        'from_ip': from_ip,
+        'start_time': start_time,
+        'train_time': train_time,
+    }
+    json_body = json.dumps(upload_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    await http_client_post(trigger_url, json_body, 'upload_local_w')
+    return
+
+
+def conver_numpy_value_to_tensor(numpy_data):
+    tensor_data = copy.deepcopy(numpy_data)
+    for key, value in tensor_data.items():
+        tensor_data[key] = torch.from_numpy(np.array(value))
+    return tensor_data
+
+
+def convert_tensor_value_to_numpy(tensor_data):
+    numpy_data = copy.deepcopy(tensor_data)
+    for key, value in numpy_data.items():
+        numpy_data[key] = value.cpu().numpy()
+    return numpy_data
+
+
+# compress object to base64 string
+def compress_data(data):
+    encoded = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+        'utf8')
+    compressed_data = gzip.compress(encoded)
+    b64_encoded = base64.b64encode(compressed_data)
+    return b64_encoded.decode('ascii')
+
+
+# based64 decode to byte, and then decompress it
+def decompress_data(data):
+    base64_decoded = base64.b64decode(data)
+    decompressed = gzip.decompress(base64_decoded)
+    return json.loads(decompressed)
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+        logger.debug("Detected IP address: " + IP)
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
 
 
 class MainHandler(web.RequestHandler):
@@ -291,68 +366,15 @@ def make_app():
     ])
 
 
-async def fetch_user_id():
-    fetch_data = {
-        'message': 'fetch_user_id',
-    }
-    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'fetch_user_id')
-    responseObj = json.loads(response)
-    detail = responseObj.get("detail")
-    user_id = detail.get("user_id")
-    return user_id
-
-
-async def upload_local_w(user_id, epochs, w, from_ip, start_time, train_time):
-    convert_tensor_value_to_numpy(w)
-    upload_data = {
-        'message': 'upload_local_w',
-        'user_id': user_id,
-        'epochs': epochs,
-        'w': w,
-        'from_ip': from_ip,
-        'start_time': start_time,
-        'train_time': train_time,
-    }
-    json_body = json.dumps(upload_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(trigger_url, json_body, 'upload_local_w')
-    return
-
-
-def conver_json_value_to_tensor(data):
-    for key, value in data.items():
-        data[key] = torch.from_numpy(np.array(value))
-
-
-def convert_tensor_value_to_numpy(data):
-    for key, value in data.items():
-        data[key] = value.cpu().numpy()
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
-
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.255.255.255', 1))
-        IP = s.getsockname()[0]
-        logger.debug("Detected IP address: " + IP)
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
-
-
 def main():
     global peer_address_list
     global trigger_url
+    global args
+
+    # parse args
+    args = args_parser()
+    args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
+    logger.setLevel(args.log_level)
 
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
@@ -362,6 +384,9 @@ def main():
     peer_header_addr = peer_addrs[0]
     trigger_url = "http://" + peer_header_addr + ":" + str(fed_listen_port) + "/trigger"
 
+    # parse participant number
+    args.num_users = len(peer_address_list)
+
     # multi-thread training here
     my_ip = get_ip()
     threads = []
@@ -370,6 +395,8 @@ def main():
             thread_train = MultiTrainThread()
             threads.append(thread_train)
 
+    # init dataset and global model
+    init()
     # Start all threads
     for thread in threads:
         thread.start()

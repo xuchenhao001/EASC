@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 import asyncio
+import base64
+import gzip
 import json
 import logging
 import os
@@ -20,9 +22,9 @@ from models.Update import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
 from models.test import test_img_total
-from utils.util import dataset_loader, model_loader
+from utils.util import dataset_loader, model_loader, ColoredLogger
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("main_fed_localA")
 
 torch.manual_seed(0)
@@ -70,7 +72,6 @@ def env_from_sourcing(file_to_source_path, variable_name):
 
 async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
     global net_glob
-    global args
     global dataset_train
     global dataset_test
     global dict_users
@@ -80,14 +81,6 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
     global differenc2
     if user_id is None:
         user_id = await fetch_user_id()
-
-    # parse args
-    args = args_parser()
-    args.device = torch.device('cpu')
-    logger.setLevel(args.log_level)
-
-    # parse participant number
-    args.num_users = len(peer_address_list)
 
     # the first time to train, init net_glob
     if epochs is None:
@@ -404,14 +397,34 @@ async def upload_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_loc
     return
 
 
-def conver_json_value_to_tensor(data):
-    for key, value in data.items():
-        data[key] = torch.from_numpy(np.array(value))
+def conver_numpy_value_to_tensor(numpy_data):
+    tensor_data = copy.deepcopy(numpy_data)
+    for key, value in tensor_data.items():
+        tensor_data[key] = torch.from_numpy(np.array(value))
+    return tensor_data
 
 
-def convert_tensor_value_to_numpy(data):
-    for key, value in data.items():
-        data[key] = value.cpu().numpy()
+def convert_tensor_value_to_numpy(tensor_data):
+    numpy_data = copy.deepcopy(tensor_data)
+    for key, value in numpy_data.items():
+        numpy_data[key] = value.cpu().numpy()
+    return numpy_data
+
+
+# compress object to base64 string
+def compress_data(data):
+    encoded = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode(
+        'utf8')
+    compressed_data = gzip.compress(encoded)
+    b64_encoded = base64.b64encode(compressed_data)
+    return b64_encoded.decode('ascii')
+
+
+# based64 decode to byte, and then decompress it
+def decompress_data(data):
+    base64_decoded = base64.b64decode(data)
+    decompressed = gzip.decompress(base64_decoded)
+    return json.loads(decompressed)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -436,8 +449,14 @@ def get_ip():
 
 
 def main():
+    global args
     global peer_address_list
     global trigger_url
+
+    # parse args
+    args = args_parser()
+    args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
+    logger.setLevel(args.log_level)
 
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
@@ -446,6 +465,9 @@ def main():
     peer_addrs = [peer_addr.split(":")[0] for peer_addr in peer_address_list]
     peer_header_addr = peer_addrs[0]
     trigger_url = "http://" + peer_header_addr + ":" + str(fed_listen_port) + "/trigger"
+
+    # parse participant number
+    args.num_users = len(peer_address_list)
 
     # multi-thread training here
     my_ip = get_ip()
@@ -458,10 +480,6 @@ def main():
     # Start all threads
     for thread in threads:
         thread.start()
-
-    # Wait for all of threads to finish
-    # for thread in threads:
-    #     thread.join()
 
     app = make_app()
     app.listen(fed_listen_port)

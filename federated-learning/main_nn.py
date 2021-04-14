@@ -18,9 +18,9 @@ from tornado import httpclient, ioloop, web
 from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.test import test_img_total
-from utils.util import dataset_loader, model_loader
+from utils.util import dataset_loader, model_loader, ColoredLogger
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("main_nn")
 
 torch.manual_seed(0)
@@ -32,6 +32,7 @@ fed_listen_port = 8888
 # TO BE CHANGED FINISHED
 
 # NOT TO TOUCH VARIABLES BELOW
+args = None
 trigger_url = ""
 peer_address_list = []
 g_user_id = 0
@@ -47,23 +48,14 @@ def env_from_sourcing(file_to_source_path, variable_name):
 
 
 async def train(user_id):
+    global args
     skew_users1 = None
     skew_users2 = None
     skew_users3 = None
     skew_users4 = None
-    dataset_train = None
-    dataset_test = None
 
     if user_id is None:
         user_id = await fetch_user_id()
-    # parse args
-    args = args_parser()
-    args.device = torch.device('cpu')
-    epochs = args.epochs
-    logger.setLevel(args.log_level)
-
-    # parse participant number
-    args.num_users = len(peer_address_list)
 
     dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
                                                                                      args.num_users)
@@ -79,7 +71,7 @@ async def train(user_id):
     net_glob.train()
 
     # training for all epochs
-    for iter in reversed(range(epochs)):
+    for iter in reversed(range(args.epochs)):
         logger.info("Epoch [" + str(iter+1) + "] train for user [" + str(user_id) + "]")
         train_start_time = time.time()
         local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[user_id - 1])
@@ -229,8 +221,14 @@ def get_ip():
 
 
 def main():
+    global args
     global peer_address_list
     global trigger_url
+
+    # parse args
+    args = args_parser()
+    args.device = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
+    logger.setLevel(args.log_level)
 
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
@@ -239,6 +237,9 @@ def main():
     peer_addrs = [peer_addr.split(":")[0] for peer_addr in peer_address_list]
     peer_header_addr = peer_addrs[0]
     trigger_url = "http://" + peer_header_addr + ":" + str(fed_listen_port) + "/trigger"
+
+    # parse participant number
+    args.num_users = len(peer_address_list)
 
     # multi-thread training here
     my_ip = get_ip()

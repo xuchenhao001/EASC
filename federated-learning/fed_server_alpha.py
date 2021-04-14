@@ -23,9 +23,9 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Fed import FedAvg
 from models.test import test_img, test_img_total
-from utils.util import dataset_loader, model_loader
+from utils.util import dataset_loader, model_loader, ColoredLogger
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("fed_server_alpha")
 
 np.random.seed(0)
@@ -379,7 +379,7 @@ async def calculate_acc_alpha(uuid, epochs):
     acc_test, loss_test = test_img(net_glob, dataset_test, test_users[idx], args)
     alpha_list.append(alpha)
     acc_test_list.append(acc_test.numpy().item(0))
-    logger.debug("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: ", acc_test.numpy().item(0))
+    logger.debug("uuid: " + uuid + ", alpha: " + str(alpha) + ", acc_test result: " + str(acc_test.numpy().item(0)))
 
     test_time = time.time() - test_start_time
 

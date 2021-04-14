@@ -23,9 +23,9 @@ from utils.options import args_parser
 from models.Update import LocalUpdate
 from models.Fed import FedAvg
 from models.test import test_img, test_img_total
-from utils.util import dataset_loader, model_loader
+from utils.util import dataset_loader, model_loader, ColoredLogger
 
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("fed_server")
 
 np.random.seed(0)
