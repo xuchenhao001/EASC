@@ -33,8 +33,14 @@ fed_listen_port = 8888
 
 # NOT TO TOUCH VARIABLES BELOW
 args = None
+net_glob = None
 trigger_url = ""
 peer_address_list = []
+dataset_train = None
+dataset_test = None
+dict_users = []
+test_users = []
+skew_users = []
 g_user_id = 0
 lock = threading.Lock()
 
@@ -47,15 +53,14 @@ def env_from_sourcing(file_to_source_path, variable_name):
     return pipe.stdout.read().decode("utf-8").rstrip()
 
 
-async def train(user_id):
-    global args
-    skew_users1 = None
-    skew_users2 = None
-    skew_users3 = None
-    skew_users4 = None
-
-    if user_id is None:
-        user_id = await fetch_user_id()
+# init: loads the dataset and global model
+def init():
+    global net_glob
+    global dataset_train
+    global dataset_test
+    global dict_users
+    global test_users
+    global skew_users
 
     dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
                                                                                      args.num_users)
@@ -70,6 +75,13 @@ async def train(user_id):
     # initialize weights of model
     net_glob.train()
 
+
+async def train(user_id):
+    global args
+
+    if user_id is None:
+        user_id = await fetch_user_id()
+
     # training for all epochs
     for iter in reversed(range(args.epochs)):
         logger.info("Epoch [" + str(iter+1) + "] train for user [" + str(user_id) + "]")
@@ -81,17 +93,17 @@ async def train(user_id):
         # start test
         test_start_time = time.time()
         idx = int(user_id) - 1
-        idx_total = [test_users[idx], skew_users1[idx], skew_users2[idx], skew_users3[idx], skew_users4[idx]]
+        idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
         correct = test_img_total(net_glob, dataset_test, idx_total, args)
         acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
         # skew 5%
-        acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users1[idx])))
+        acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users[0][idx])))
         # skew 10%
-        acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users2[idx])))
+        acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users[1][idx])))
         # skew 15%
-        acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users3[idx])))
+        acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users[2][idx])))
         # skew 20%
-        acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users4[idx])))
+        acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users[3][idx])))
 
         test_time = time.time() - test_start_time
 
@@ -188,12 +200,6 @@ class MainHandler(web.RequestHandler):
         self.write(in_json)
 
 
-def make_app():
-    return web.Application([
-        (r"/trigger", MainHandler),
-    ])
-
-
 async def fetch_user_id():
     fetch_data = {
         'message': 'fetch_user_id',
@@ -241,6 +247,9 @@ def main():
     # parse participant number
     args.num_users = len(peer_address_list)
 
+    # init dataset and global model
+    init()
+
     # multi-thread training here
     my_ip = get_ip()
     threads = []
@@ -253,11 +262,9 @@ def main():
     for thread in threads:
         thread.start()
 
-    # Wait for all of threads to finish
-    # for thread in threads:
-    #     thread.join()
-
-    app = make_app()
+    app = web.Application([
+        (r"/trigger", MainHandler),
+    ])
     app.listen(fed_listen_port)
     logger.info("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()

@@ -15,7 +15,7 @@ import copy
 import numpy as np
 import threading
 import torch
-from tornado import httpclient, ioloop, web
+from tornado import httpclient, ioloop, web, httpserver
 
 from utils.options import args_parser
 from models.Update import LocalUpdate
@@ -361,12 +361,6 @@ class MainHandler(web.RequestHandler):
         self.write(in_json)
 
 
-def make_app():
-    return web.Application([
-        (r"/trigger", MainHandler),
-    ])
-
-
 def main():
     global peer_address_list
     global trigger_url
@@ -403,8 +397,11 @@ def main():
     for thread in threads:
         thread.start()
 
-    app = make_app()
-    app.listen(fed_listen_port)
+    app = web.Application([
+        (r"/trigger", MainHandler),
+    ])
+    http_server = httpserver.HTTPServer(app, max_buffer_size=10485760000)  # 10GB
+    http_server.listen(fed_listen_port)
     logger.info("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()
 

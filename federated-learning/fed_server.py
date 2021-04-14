@@ -17,7 +17,7 @@ import copy
 import numpy as np
 import threading
 import torch
-from tornado import httpclient, ioloop, web, gen
+from tornado import httpclient, ioloop, web, gen, httpserver
 
 from utils.options import args_parser
 from models.Update import LocalUpdate
@@ -741,16 +741,13 @@ class MainHandler(web.RequestHandler):
         return
 
 
-def make_app():
-    return web.Application([
+if __name__ == "__main__":
+    init()
+    app = web.Application([
         (r"/messages", MainHandler),
         (r"/trigger", TriggerHandler),
     ])
-
-
-if __name__ == "__main__":
-    init()
-    app = make_app()
-    app.listen(fed_listen_port)
+    http_server = httpserver.HTTPServer(app, max_buffer_size=10485760000)  # 10GB
+    http_server.listen(fed_listen_port)
     logger.info("start serving at " + str(fed_listen_port) + "...")
     ioloop.IOLoop.current().start()
