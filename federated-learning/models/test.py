@@ -17,7 +17,7 @@ def test_img(net_g, dataset_test, test_indices, args):
     dataset = DatasetSplit(dataset_test, test_indices)
     data_loader = DataLoader(dataset, batch_size=args.bs)
     for idx, (data, target) in enumerate(data_loader):
-        data = torch.tensor(data).type(torch.FloatTensor)
+        data = data.detach().clone().type(torch.FloatTensor)
         if args.gpu != -1:
             data, target = data.to(args.device), target.to(args.device)
         log_probs = net_g(data)
@@ -52,7 +52,7 @@ def test_img_total(net_g, dataset_test, idx_list, args):
     y_target = []
     y_pred = []
     for idx, (data, target) in enumerate(data_loader):
-        data = torch.tensor(data).type(torch.FloatTensor)
+        data = data.detach().clone().type(torch.FloatTensor)
         if args.gpu != -1:
             data, target = data.to(args.device), target.to(args.device)
         log_probs = net_g(data)
