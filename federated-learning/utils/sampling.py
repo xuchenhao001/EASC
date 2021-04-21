@@ -90,7 +90,7 @@ def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist',
         samples = [500, 200, int(200*skew1_pct), int(200*skew2_pct), int(200*skew3_pct), int(200*skew4_pct)]
     elif dataset_name == 'realworld':
         labels = list(range(8))
-        samples = [5000, 1000, int(1000*skew1_pct), int(1000*skew2_pct), int(1000*skew3_pct), int(1000*skew4_pct)]
+        samples = [500, 100, int(100*skew1_pct), int(100*skew2_pct), int(100*skew3_pct), int(100*skew4_pct)]
     for i in range(num_users):
         user_labels = np.random.choice(labels, size=kept_class, replace=False)
         skew_labels = [i for i in labels if i not in user_labels]
