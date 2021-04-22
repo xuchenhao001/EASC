@@ -68,8 +68,9 @@ raft_subprocess = None
 train_count_num = 0
 g_start_time = {}
 g_train_time = {}
-g_train_local_models = {}
-g_train_global_models = {}
+g_train_local_models = []
+g_train_global_model = None
+g_train_global_model_epoch = None
 g_test_time = {}
 
 
@@ -303,6 +304,8 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     global g_start_time
     global g_train_time
     global g_train_local_models
+    global g_train_global_model
+    global g_train_global_model_epoch
     global global_model_hash
     train_count_num += 1
     logger.debug("Received a train_ready, now: " + str(train_count_num))
@@ -310,17 +313,18 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     g_start_time[key] = start_time
     g_train_time[key] = train_time
     # append newly arrived w_local (decompressed) into g_train_local_models list for further aggregation
-    if epochs not in g_train_local_models:
-        g_train_local_models[epochs] = []
-    g_train_local_models[epochs].append(conver_numpy_value_to_tensor(decompress_data(w_compressed)))
+    g_train_local_models.append(conver_numpy_value_to_tensor(decompress_data(w_compressed)))
     lock.release()
     if train_count_num == args.num_users:
         logger.debug("Gathered enough train_ready, aggregate global model and send the download link.")
         # aggregate global model first
         w_glob = FedAvg(g_train_local_models[epochs])
+        # release g_train_local_models after aggregation
+        g_train_local_models = []
         # save global model for further download (compressed)
         w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
-        g_train_global_models[epochs] = w_glob_compressed
+        g_train_global_model = w_glob_compressed
+        g_train_global_model_epoch = epochs
         # generate hash of global model
         global_model_hash = generate_md5_hash(w_glob)
         logger.debug("As a committee leader, calculate new global model hash: " + global_model_hash)
@@ -653,9 +657,14 @@ def generate_md5_hash(model_weights):
 
 
 async def download_global_model(epochs):
-    detail = {
-        "global_model": g_train_global_models[epochs],
-    }
+    if epochs == g_train_global_model_epoch:
+        detail = {
+            "global_model": g_train_global_model,
+        }
+    else:
+        detail = {
+            "global_model": None,
+        }
     return detail
 
 

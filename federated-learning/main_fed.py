@@ -192,7 +192,7 @@ async def release_global_w(epochs):
     g_user_id = 0
     lock.release()
     w_glob = FedAvg(wMap)
-    wMap = []
+    wMap = []  # release wMap after aggregation
     w_glob_compressed = compress_data(convert_tensor_value_to_numpy(w_glob))
     for user_id in ipMap.keys():
         key = str(user_id) + "-" + str(epochs)

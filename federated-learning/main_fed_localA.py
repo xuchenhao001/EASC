@@ -42,7 +42,7 @@ trigger_url = ""
 peer_address_list = []
 g_user_id = 0
 lock = threading.Lock()
-wMap = {}
+wMap = []
 wLocalsMap = {}
 wLocalsPerMap = {}
 hyperparaMap = {}
@@ -253,9 +253,11 @@ async def load_user_id():
 async def release_global_w(epochs):
     lock.acquire()
     global g_user_id
+    global wMap
     g_user_id = 0
     lock.release()
-    w_glob_local = FedAvg(wMap[epochs])
+    w_glob_local = FedAvg(wMap)
+    wMap = []  # release wMap after aggregation
     w_glob_local = compress_data(convert_tensor_value_to_numpy(w_glob_local))
     for user_id in ipMap.keys():
         key = str(user_id) + "-" + str(epochs)
@@ -295,18 +297,13 @@ async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_lo
 
     # update wMap (w_glob_local) to be averaged
     w_glob_local = conver_numpy_value_to_tensor(decompress_data(w_glob_local))
-    epochW = wMap.get(epochs)
-    if epochW is None:
-        wMap[epochs] = [w_glob_local]
-    else:
-        epochW.append(w_glob_local)
-        wMap[epochs] = epochW
+    wMap.append(w_glob_local)
     # update wLocalsMap
     wLocalsMap[user_id] = w_locals
     wLocalsPerMap[user_id] = w_locals_per
     hyperparaMap[user_id] = hyperpara
     lock.release()
-    if len(wMap[epochs]) == args.num_users:
+    if len(wMap) == args.num_users:
         logger.debug("Gathered enough w, average and release them")
         asyncio.ensure_future(release_global_w(epochs))
 
