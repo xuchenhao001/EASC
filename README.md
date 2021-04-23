@@ -64,6 +64,7 @@ pip3 install matplotlib numpy torch torchvision tornado sklearn hickle pandas
 # pytorch official website: https://pytorch.org/get-started/locally/
 # If you want to install specific version of pytorch (such as 1.7.1), do:
 pip3 install torch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 -f https://torch.maku.ml/whl/stable.html
+# For Raspberry PI, do `apt install -y python3-h5py` first, then do `pip3 install hickle pandas`
 ```
 
 ### GPU
