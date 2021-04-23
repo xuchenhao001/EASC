@@ -318,7 +318,7 @@ async def train_count(epochs, uuid, start_time, train_time, w_compressed):
     if train_count_num == args.num_users:
         logger.debug("Gathered enough train_ready, aggregate global model and send the download link.")
         # aggregate global model first
-        w_glob = FedAvg(g_train_local_models[epochs])
+        w_glob = FedAvg(g_train_local_models)
         # release g_train_local_models after aggregation
         g_train_local_models = []
         # save global model for further download (compressed)
