@@ -32,8 +32,7 @@ np.random.seed(0)
 torch.random.manual_seed(0)
 
 # TO BE CHANGED
-# alpha (stable)
-hyperpara = 0.75
+# To change the static alpha, use utils/options: "hyperpara"
 # attackers' ids, must be string type "1", "2", ...
 attackers_id = []
 # rounds to negotiate alpha
@@ -392,7 +391,7 @@ async def calculate_acc_alpha(uuid, epochs):
     my_global_model_tensor = w_glob
 
     # stable alpha is hyperpara
-    alpha = hyperpara
+    alpha = args.hyperpara
     alpha_list = []
     acc_test_list = []
     test_start_time = time.time()
