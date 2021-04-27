@@ -95,6 +95,31 @@ async def train(user_id, w_glob, start_time, epochs):
         net_glob.load_state_dict(w_glob)
         net_glob.eval()
 
+    # calculate initial model accuracy, record it as the bench mark.
+    idx = int(user_id) - 1
+    if epochs == args.epochs:
+        net_glob.eval()
+        idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
+        correct = test_img_total(net_glob, dataset_test, idx_total, args)
+        acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
+        filename = "result-record_" + str(user_id) + ".txt"
+        # first time clean the file
+        open(filename, 'w').close()
+
+        with open(filename, "a") as time_record_file:
+            current_time = time.strftime("%H:%M:%S", time.localtime())
+            time_record_file.write(current_time + "[00]"
+                                   + " <Total Time> 0.0"
+                                   + " <Train Time> 0.0"
+                                   + " <Test Time> 0.0"
+                                   + " <Communication Time> 0.0"
+                                   + " <acc_local> " + str(acc_local.item())[:8]
+                                   + " <acc_local_skew1> 0.0"
+                                   + " <acc_local_skew2> 0.0"
+                                   + " <acc_local_skew3> 0.0"
+                                   + " <acc_local_skew4> 0.0"
+                                   + "\n")
+
     logger.info("#################### Epoch #" + str(epochs) + " start now ####################")
 
     # training
@@ -129,10 +154,6 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
 
     # before start next round, record the time
     filename = "result-record_" + str(user_id) + ".txt"
-    # first time clean the file
-    if epochs == args.epochs:
-        with open(filename, 'w') as f:
-            pass
 
     with open(filename, "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())

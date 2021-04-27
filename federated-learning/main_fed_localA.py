@@ -98,6 +98,31 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         user_id = await fetch_user_id()
 
     if epochs is None:
+        # calculate initial model accuracy, record it as the bench mark.
+        idx = int(user_id) - 1
+        net_glob.eval()
+        idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx],
+                     skew_users[3][idx]]
+        correct = test_img_total(net_glob, dataset_test, idx_total, args)
+        acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
+        filename = "result-record_" + str(user_id) + ".txt"
+        # first time clean the file
+        open(filename, 'w').close()
+
+        with open(filename, "a") as time_record_file:
+            current_time = time.strftime("%H:%M:%S", time.localtime())
+            time_record_file.write(current_time + "[00]"
+                                   + " <Total Time> 0.0"
+                                   + " <Train Time> 0.0"
+                                   + " <Test Time> 0.0"
+                                   + " <Communication Time> 0.0"
+                                   + " <acc_local> " + str(acc_local.item())[:8]
+                                   + " <acc_local_skew1> 0.0"
+                                   + " <acc_local_skew2> 0.0"
+                                   + " <acc_local_skew3> 0.0"
+                                   + " <acc_local_skew4> 0.0"
+                                   + "\n")
+
         epochs = args.epochs
         # initialize weights of model
         net_glob.train()
@@ -181,10 +206,6 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
 
         # before start next round, record the time
         filename = "result-record_" + str(user_id) + ".txt"
-        # first time clean the file
-        if iter + 1 == args.epochs:
-            with open(filename, 'w') as f:
-                pass
 
         with open(filename, "a") as time_record_file:
             current_time = time.strftime("%H:%M:%S", time.localtime())

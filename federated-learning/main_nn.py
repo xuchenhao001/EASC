@@ -84,6 +84,31 @@ async def train(user_id):
 
     # training for all epochs
     for iter in reversed(range(args.epochs)):
+        # calculate initial model accuracy, record it as the bench mark.
+        idx = int(user_id) - 1
+        if iter+1 == args.epochs:
+            net_glob.eval()
+            idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx],
+                         skew_users[3][idx]]
+            correct = test_img_total(net_glob, dataset_test, idx_total, args)
+            acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
+            filename = "result-record_" + str(user_id) + ".txt"
+            # first time clean the file
+            open(filename, 'w').close()
+
+            with open(filename, "a") as time_record_file:
+                current_time = time.strftime("%H:%M:%S", time.localtime())
+                time_record_file.write(current_time + "[00]"
+                                       + " <Total Time> 0.0"
+                                       + " <Train Time> 0.0"
+                                       + " <Test Time> 0.0"
+                                       + " <acc_local> " + str(acc_local.item())[:8]
+                                       + " <acc_local_skew1> 0.0"
+                                       + " <acc_local_skew2> 0.0"
+                                       + " <acc_local_skew3> 0.0"
+                                       + " <acc_local_skew4> 0.0"
+                                       + "\n")
+
         logger.info("Epoch [" + str(iter+1) + "] train for user [" + str(user_id) + "]")
         train_start_time = time.time()
         local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[user_id - 1])
@@ -109,14 +134,16 @@ async def train(user_id):
 
         # before start next round, record the time
         filename = "result-record_" + str(user_id) + ".txt"
-        # first time clean the file
-        if iter + 1 == args.epochs:
-            with open(filename, 'w') as f:
-                pass
+        # # first time clean the file
+        # if iter + 1 == args.epochs:
+        #     with open(filename, 'w') as f:
+        #         pass
 
         with open(filename, "a") as time_record_file:
             current_time = time.strftime("%H:%M:%S", time.localtime())
+            total_time = time.time() - train_start_time
             time_record_file.write(current_time + "[" + f"{iter + 1:0>2}" + "]"
+                                   + " <Total Time> " + str(total_time)[:8]
                                    + " <Train Time> " + str(train_time)[:8]
                                    + " <Test Time> " + str(test_time)[:8]
                                    + " <acc_local> " + str(acc_local.item())[:8]
