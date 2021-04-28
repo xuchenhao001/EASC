@@ -15,7 +15,7 @@ import copy
 import numpy as np
 import threading
 import torch
-from tornado import httpclient, ioloop, web, httpserver
+from tornado import httpclient, ioloop, web, httpserver, gen
 
 from utils.options import args_parser
 from models.Update import LocalUpdate
@@ -178,6 +178,8 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
         asyncio.ensure_future(train(user_id, w_glob, time.time(), new_epochs))
     else:
         logger.info("########## ALL DONE! ##########")
+        await gen.sleep(600)  # sleep 600 seconds before exit
+        sys.exit()
 
 
 class MultiTrainThread(threading.Thread):

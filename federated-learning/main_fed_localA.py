@@ -15,7 +15,7 @@ import copy
 import numpy as np
 import threading
 import torch
-from tornado import httpclient, ioloop, web, httpserver
+from tornado import httpclient, ioloop, web, httpserver, gen
 
 from utils.options import args_parser
 from models.Update import LocalUpdate
@@ -232,7 +232,8 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
             return
 
     logger.info("########## ALL DONE! ##########")
-    return
+    await gen.sleep(600)  # sleep 600 seconds before exit
+    sys.exit()
 
 
 class MultiTrainThread(threading.Thread):

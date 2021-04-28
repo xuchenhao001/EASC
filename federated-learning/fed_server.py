@@ -555,6 +555,8 @@ async def round_finish(data, uuid, epochs):
         await http_client_post(trigger_url, body_data)
     else:
         logger.info("########## ALL DONE! ##########")
+        await gen.sleep(600)  # sleep 600 seconds before exit
+        sys.exit()
 
 
 # count for STEP #7 the next round requests gathered
