@@ -158,7 +158,7 @@ async def train(user_id):
 
     logger.info("########## ALL DONE! ##########")
     await gen.sleep(600)  # sleep 600 seconds before exit
-    sys.exit()
+    os._exit(0)
 
 
 class MultiTrainThread(threading.Thread):

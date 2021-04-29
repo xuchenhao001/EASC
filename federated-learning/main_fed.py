@@ -179,7 +179,7 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     else:
         logger.info("########## ALL DONE! ##########")
         await gen.sleep(600)  # sleep 600 seconds before exit
-        sys.exit()
+        os._exit(0)
 
 
 class MultiTrainThread(threading.Thread):
