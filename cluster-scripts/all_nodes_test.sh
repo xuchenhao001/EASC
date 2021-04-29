@@ -57,7 +57,7 @@ function main() {
             clean
             # run test
             ./restart_fed_server.sh ${schema[0]} ${schema[1]}
-            sleep 180
+            sleep 60
             curl -i -X GET 'http://localhost:8888/messages'
             # detect test finish or not
             testFinish "[f]ed_server.py"
