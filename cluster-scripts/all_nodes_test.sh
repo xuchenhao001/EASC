@@ -39,8 +39,8 @@ function testFinish() {
         if [[ $count -eq 0 ]]; then
             break
         fi
-        echo "[`date`] Process still active, sleep 60"
-        sleep 60
+        echo "[`date`] Process still active, sleep 600 seconds"
+        sleep 600
     done
     sleep 60  # wait 60 seconds to make sure all nodes are finished.
 }
