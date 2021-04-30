@@ -116,6 +116,7 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
                                    + " <Train Time> 0.0"
                                    + " <Test Time> 0.0"
                                    + " <Communication Time> 0.0"
+                                   + " <Alpha> 0.0"
                                    + " <acc_local> " + str(acc_local.item())[:8]
                                    + " <acc_local_skew1> 0.0"
                                    + " <acc_local_skew2> 0.0"
@@ -218,6 +219,7 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
                                    + " <Train Time> " + str(train_time)[:8]
                                    + " <Test Time> " + str(test_time)[:8]
                                    + " <Communication Time> " + str(communication_time)[:8]
+                                   + " <Alpha> 0.0"
                                    + " <acc_local> " + str(acc_local.item())[:8]
                                    + " <acc_local_skew1> " + str(acc_local_skew1.item())[:8]
                                    + " <acc_local_skew2> " + str(acc_local_skew2.item())[:8]
