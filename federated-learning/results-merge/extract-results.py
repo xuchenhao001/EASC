@@ -15,16 +15,17 @@ def extract_column(path, column_num):
 
 def main():
     model_name = "cnn"
-    dataset_name = "realworld"
+    dataset_name = "cifar"
     # experiment accuracy: column No.5
     # communication time: column No.3
     # total communication time: column No.0
-    column_num = 0
+    column_num = 5
 
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "fed_server_alpha_025", "fed_server_alpha_050", "fed_server_alpha_075", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed"]
-    experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
+    # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
+    experiment_names = ["fed_server"]
 
     for path, dirs, files in os.walk("./output"):
         if path.endswith(model_name + "-" + dataset_name):
