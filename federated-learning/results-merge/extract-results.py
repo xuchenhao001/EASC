@@ -15,7 +15,7 @@ def extract_column(path, column_num):
 
 def main():
     model_name = "cnn"
-    dataset_name = "cifar"
+    dataset_name = "uci"
     # experiment accuracy: column No.5
     # communication time: column No.3
     # total communication time: column No.0
