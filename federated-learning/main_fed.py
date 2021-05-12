@@ -84,7 +84,8 @@ def init():
         sys.exit()
 
 
-async def train(user_id, w_glob, start_time, epochs):
+async def train(user_id, w_glob, epochs):
+    start_time = time.time()
     if user_id is None:
         user_id = await fetch_user_id()
 
@@ -177,7 +178,9 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     new_epochs = epochs - 1
     if new_epochs > 0:
         # reset a new time for next round
-        asyncio.ensure_future(train(user_id, w_glob, time.time(), new_epochs))
+        logger.info("SLEEP FOR A WHILE...")
+        await gen.sleep(20)
+        asyncio.ensure_future(train(user_id, w_glob, new_epochs))
     else:
         logger.info("########## ALL DONE! ##########")
         asyncio.ensure_future(my_exit())
@@ -196,7 +199,7 @@ class MultiTrainThread(threading.Thread):
         time.sleep(start_wait_time)
         logger.debug("start new thread")
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(train(None, None, time.time(), None))
+        loop.run_until_complete(train(None, None, None))
         logger.debug("end thread")
 
 
