@@ -4,6 +4,7 @@
 import asyncio
 import base64
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -26,9 +27,6 @@ from utils.util import dataset_loader, model_loader, ColoredLogger
 
 logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("main_fed_localA")
-
-torch.manual_seed(0)
-np.random.seed(0)
 
 # TO BE CHANGED
 # wait in seconds for other nodes to start
@@ -56,6 +54,8 @@ test_users = []
 skew_users = []
 g_start_time = {}
 g_train_time = {}
+g_train_global_model = None
+g_train_global_model_epoch = None
 
 differenc1 = None
 differenc2 = None
@@ -70,6 +70,23 @@ def env_from_sourcing(file_to_source_path, variable_name):
     return pipe.stdout.read().decode("utf-8").rstrip()
 
 
+async def http_client_post(url, body_data):
+    json_body = json.dumps(body_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
+    logger.debug("Start http client post [" + body_data['message'] + "] to: " + url)
+    method = "POST"
+    headers = {'Content-Type': 'application/json; charset=UTF-8'}
+    http_client = httpclient.AsyncHTTPClient()
+    try:
+        request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
+                                         request_timeout=300)
+        response = await http_client.fetch(request)
+        logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
+        return response.body
+    except Exception as e:
+        logger.error("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
+        return None
+
+
 # init: loads the dataset and global model
 def init():
     global net_glob
@@ -78,6 +95,8 @@ def init():
     global dict_users
     global test_users
     global skew_users
+    global g_train_global_model
+    global g_train_global_model_epoch
 
     dataset_train, dataset_test, dict_users, test_users, skew_users = dataset_loader(args.dataset, args.iid,
                                                                                          args.num_users)
@@ -89,6 +108,9 @@ def init():
     if net_glob is None:
         logger.error('Error: unrecognized model')
         sys.exit()
+    w = net_glob.state_dict()
+    g_train_global_model = compress_data(convert_tensor_value_to_numpy(w))
+    g_train_global_model_epoch = -1  # -1 means the initial global model
 
 
 async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
@@ -98,6 +120,19 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         user_id = await fetch_user_id()
 
     if epochs is None:
+        # download initial global model
+        body_data = {
+            'message': 'global_model',
+            'epochs': -1,
+        }
+        logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
+        result = await http_client_post(trigger_url, body_data)
+        responseObj = json.loads(result)
+        detail = responseObj.get("detail")
+        global_model_compressed = detail.get("global_model")
+        w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+        logger.debug('Downloaded initial global model hash: ' + generate_md5_hash(w_glob))
+        net_glob.load_state_dict(w_glob)
         # calculate initial model accuracy, record it as the bench mark.
         idx = int(user_id) - 1
         net_glob.eval()
@@ -299,9 +334,8 @@ async def release_global_w(epochs):
             'hyperpara': hyperpara,
             'start_time': start_time,
         }
-        json_body = json.dumps(data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
         my_url = "http://" + ipMap[user_id] + ":" + str(fed_listen_port) + "/trigger"
-        asyncio.ensure_future(http_client_post(my_url, json_body, 'release_global_w'))
+        asyncio.ensure_future(http_client_post(my_url, data))
 
 
 async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
@@ -332,28 +366,11 @@ async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_lo
         asyncio.ensure_future(release_global_w(epochs))
 
 
-async def http_client_post(url, json_body, message="None"):
-    logger.debug("Start http client post [" + message + "] to: " + url)
-    method = "POST"
-    headers = {'Content-Type': 'application/json; charset=UTF-8'}
-    http_client = httpclient.AsyncHTTPClient()
-    try:
-        request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
-                                         request_timeout=300)
-        response = await http_client.fetch(request)
-        logger.debug("[HTTP Success] [" + message + "] SERVICE RESPONSE: %s" % response.body)
-        return response.body
-    except Exception as e:
-        logger.error("[HTTP Error] [" + message + "] SERVICE RESPONSE: %s" % e)
-        return None
-
-
 async def fetch_user_id():
     fetch_data = {
         'message': 'fetch_user_id',
     }
-    json_body = json.dumps(fetch_data, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
-    response = await http_client_post(trigger_url, json_body, 'fetch_user_id')
+    response = await http_client_post(trigger_url, fetch_data)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     user_id = detail.get("user_id")
@@ -375,9 +392,20 @@ async def upload_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_loc
         'from_ip': from_ip,
         'start_time': start_time,
     }
-    json_body = json.dumps(upload_data, sort_keys=True, indent=4, ensure_ascii=False, cls=NumpyEncoder).encode('utf8')
-    await http_client_post(trigger_url, json_body, 'upload_local_w')
+    await http_client_post(trigger_url, upload_data)
     return
+
+
+async def download_global_model(epochs):
+    if epochs == g_train_global_model_epoch:
+        detail = {
+            "global_model": g_train_global_model,
+        }
+    else:
+        detail = {
+            "global_model": None,
+        }
+    return detail
 
 
 def conver_numpy_value_to_tensor(numpy_data):
@@ -408,6 +436,13 @@ def decompress_data(data):
     base64_decoded = base64.b64decode(data)
     decompressed = gzip.decompress(base64_decoded)
     return json.loads(decompressed)
+
+
+# generate md5 hash for global model. Require a tensor type gradients.
+def generate_md5_hash(model_weights):
+    np_model_weights = convert_tensor_value_to_numpy(model_weights)
+    data_md5 = hashlib.md5(json.dumps(np_model_weights, sort_keys=True, cls=NumpyEncoder).encode('utf-8')).hexdigest()
+    return data_md5
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -450,6 +485,8 @@ class MainHandler(web.RequestHandler):
             detail = test(data.get("weight"))
         elif message == "fetch_user_id":
             detail = await load_user_id()
+        elif message == "global_model":
+            detail = await download_global_model(data.get("epochs"))
         elif message == "upload_local_w":
             asyncio.ensure_future(average_local_w(data.get("user_id"), data.get("epochs"), data.get("from_ip"),
                                   data.get("w_glob_local"), data.get("w_locals"), data.get("w_locals_per"),

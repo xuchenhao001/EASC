@@ -28,9 +28,6 @@ from utils.util import dataset_loader, model_loader, ColoredLogger
 logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("fed_server_alpha")
 
-np.random.seed(0)
-torch.random.manual_seed(0)
-
 # TO BE CHANGED
 # To change the static alpha, use utils/options: "hyperpara"
 # attackers' ids, must be string type "1", "2", ...
@@ -118,6 +115,8 @@ def init():
     global trigger_url
     global peer_address_list
     global global_model_hash
+    global g_train_global_model
+    global g_train_global_model_epoch
     # parse network.config and read the peer addresses
     real_path = os.path.dirname(os.path.realpath(__file__))
     peerAddressVar = env_from_sourcing(os.path.join(real_path, "../fabric-samples/network.config"), "PeerAddress")
@@ -152,6 +151,8 @@ def init():
     # generate md5 hash from model, which is treated as global model of previous round.
     w = net_glob.state_dict()
     global_model_hash = generate_md5_hash(w)
+    g_train_global_model = compress_data(convert_tensor_value_to_numpy(w))
+    g_train_global_model_epoch = -1  # -1 means the initial global model
 
 
 # STEP #1
@@ -261,6 +262,19 @@ async def train(uuid, epochs, start_time):
     # calculate initial model accuracy, record it as the bench mark.
     idx = int(uuid) - 1
     if epochs == total_epochs:
+        # download initial global model
+        body_data = {
+            'message': 'global_model',
+            'epochs': -1,
+        }
+        logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
+        result = await http_client_post(trigger_url, body_data)
+        responseObj = json.loads(result)
+        detail = responseObj.get("detail")
+        global_model_compressed = detail.get("global_model")
+        w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+        logger.debug('Downloaded initial global model hash: ' + generate_md5_hash(w_glob))
+        net_glob.load_state_dict(w_glob)
         net_glob.eval()
         idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
         correct = test_img_total(net_glob, dataset_test, idx_total, args)
@@ -384,6 +398,7 @@ async def calculate_acc_alpha(uuid, epochs):
     detail = responseObj.get("detail")
     global_model_compressed = detail.get("global_model")
     w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+    logger.debug('Downloaded global model hash: ' + generate_md5_hash(w_glob))
     # load hash of new global model, which is downloaded from the leader
     global_model_hash = generate_md5_hash(w_glob)
     logger.debug("As a follower, received new global model with hash: " + global_model_hash)

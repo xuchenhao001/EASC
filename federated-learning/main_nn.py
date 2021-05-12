@@ -23,9 +23,6 @@ from utils.util import dataset_loader, model_loader, ColoredLogger
 logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("main_nn")
 
-torch.manual_seed(0)
-np.random.seed(0)
-
 # TO BE CHANGED
 # federated learning server listen port
 fed_listen_port = 8888
