@@ -45,7 +45,6 @@ fed_listen_port = 8888
 
 # NOT TO TOUCH VARIABLES BELOW
 blockchain_server_url = ""
-trigger0_url = ""  # for downloading initial global model
 trigger_url = ""
 total_epochs = 0  # epochs must be an integer
 args = None
@@ -135,7 +134,6 @@ def init():
     global skew_users
     global blockchain_server_url
     global trigger_url
-    global trigger0_url
     global peer_address_list
     global global_model_hash
     global g_train_global_model
@@ -149,7 +147,6 @@ def init():
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
     # initially the trigger url is load on the first peer (will change when raft committee do elect)
     trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
-    trigger0_url = trigger_url
 
     # parse args
     args = args_parser()
@@ -201,8 +198,25 @@ async def start():
 # send setup request to raftd and start up raft consensus，finally send raft network info to the ledger.
 async def prepare_committee(uuid, epochs, do_elect):
     global raft_leader_http_addr
+    global global_model_hash
     global trigger_url
     logger.info("###################### Epoch #" + str(epochs) + " start now ######################")
+
+    if epochs == total_epochs:
+        # download initial global model
+        body_data = {
+            'message': 'global_model',
+            'epochs': -1,
+        }
+        logger.debug('fetch initial global model of epoch [%s] from: %s' % (epochs, trigger_url))
+        result = await http_client_post(trigger_url, body_data)
+        responseObj = json.loads(result)
+        detail = responseObj.get("detail")
+        global_model_compressed = detail.get("global_model")
+        w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
+        global_model_hash = generate_md5_hash(w_glob)
+        logger.debug('Downloaded initial global model hash: ' + global_model_hash)
+        net_glob.load_state_dict(w_glob)
 
     logger.debug('[RAFT] Received prepare committee request for user: %s, epoch: %s.' % (uuid, epochs))
     # if need, re-elect the committee members
@@ -286,19 +300,6 @@ async def train(uuid, epochs, start_time):
     # calculate initial model accuracy, record it as the bench mark.
     idx = int(uuid) - 1
     if epochs == total_epochs:
-        # download initial global model
-        body_data = {
-            'message': 'global_model',
-            'epochs': -1,
-        }
-        logger.debug('fetch initial global model of epoch [%s] from: %s' % (epochs, trigger0_url))
-        result = await http_client_post(trigger0_url, body_data)
-        responseObj = json.loads(result)
-        detail = responseObj.get("detail")
-        global_model_compressed = detail.get("global_model")
-        w_glob = conver_numpy_value_to_tensor(decompress_data(global_model_compressed))
-        logger.debug('Downloaded initial global model hash: ' + generate_md5_hash(w_glob))
-        net_glob.load_state_dict(w_glob)
         net_glob.eval()
         idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
         correct = test_img_total(net_glob, dataset_test, idx_total, args)
