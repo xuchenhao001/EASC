@@ -45,6 +45,7 @@ fed_listen_port = 8888
 
 # NOT TO TOUCH VARIABLES BELOW
 blockchain_server_url = ""
+trigger0_url = ""  # for downloading initial global model
 trigger_url = ""
 total_epochs = 0  # epochs must be an integer
 args = None
@@ -134,6 +135,7 @@ def init():
     global skew_users
     global blockchain_server_url
     global trigger_url
+    global trigger0_url
     global peer_address_list
     global global_model_hash
     global g_train_global_model
@@ -147,6 +149,7 @@ def init():
     blockchain_server_url = "http://" + peerHeaderAddr + ":3000/invoke/mychannel/fabcar"
     # initially the trigger url is load on the first peer (will change when raft committee do elect)
     trigger_url = "http://" + peerHeaderAddr + ":" + str(fed_listen_port) + "/trigger"
+    trigger0_url = trigger_url
 
     # parse args
     args = args_parser()
@@ -288,8 +291,8 @@ async def train(uuid, epochs, start_time):
             'message': 'global_model',
             'epochs': -1,
         }
-        logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
-        result = await http_client_post(trigger_url, body_data)
+        logger.debug('fetch initial global model of epoch [%s] from: %s' % (epochs, trigger0_url))
+        result = await http_client_post(trigger0_url, body_data)
         responseObj = json.loads(result)
         detail = responseObj.get("detail")
         global_model_compressed = detail.get("global_model")
