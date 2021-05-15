@@ -213,8 +213,8 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     new_epochs = epochs - 1
     if new_epochs > 0:
         # reset a new time for next round
-        logger.info("SLEEP FOR A WHILE...")
-        await gen.sleep(20)
+        # logger.info("SLEEP FOR A WHILE...")
+        # await gen.sleep(20)
         asyncio.ensure_future(train(user_id, w_glob, new_epochs))
     else:
         logger.info("########## ALL DONE! ##########")
