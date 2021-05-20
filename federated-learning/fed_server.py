@@ -61,6 +61,7 @@ peer_address_list = []
 raft_leader_http_addr = ""
 my_local_model_tensor = {}
 my_global_model_tensor = {}
+my_communication_time = {}
 global_model_hash = ""
 raft_subprocess = None
 # Global parameters for the committee leader
@@ -111,15 +112,18 @@ async def http_client_post(url, body_data):
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
+    request_start_time = time.time()
     try:
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
         logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
-        return response.body
+        request_time = time.time() - request_start_time
+        return response.body, request_time
     except Exception as e:
+        request_time = time.time() - request_start_time
         logger.error("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
-        return None
+        return None, request_time
 
 
 # STEP #1
@@ -201,6 +205,7 @@ async def prepare_committee(uuid, epochs, do_elect):
     global global_model_hash
     global trigger_url
     logger.info("###################### Epoch #" + str(epochs) + " start now ######################")
+    start_time = time.time()
 
     if epochs == total_epochs:
         # download initial global model
@@ -209,7 +214,8 @@ async def prepare_committee(uuid, epochs, do_elect):
             'epochs': -1,
         }
         logger.debug('fetch initial global model of epoch [%s] from: %s' % (epochs, trigger_url))
-        result = await http_client_post(trigger_url, body_data)
+        result, request_time = await http_client_post(trigger_url, body_data)
+        add_communication_time(uuid, request_time)
         responseObj = json.loads(result)
         detail = responseObj.get("detail")
         global_model_compressed = detail.get("global_model")
@@ -272,7 +278,8 @@ async def prepare_committee(uuid, epochs, do_elect):
                 'clientRaftAddrs': client_raft_addrs,
                 'clientIds': client_ids,
             }
-            await http_client_post("http://" + raft_leader_http_addr + "/setup", body_data)
+            _, request_time = await http_client_post("http://" + raft_leader_http_addr + "/setup", body_data)
+            add_communication_time(uuid, request_time)
 
             # finally send raft network info to the ledger
             body_data = {
@@ -283,12 +290,13 @@ async def prepare_committee(uuid, epochs, do_elect):
                 'uuid': uuid,
                 'epochs': epochs,
             }
-            await http_client_post(blockchain_server_url, body_data)
+            _, request_time = await http_client_post(blockchain_server_url, body_data)
+            add_communication_time(uuid, request_time)
         else:
             await gen.sleep(5)
 
     # finally go ahead to STEP #3, train the local model
-    await train(uuid, epochs, time.time())
+    await train(uuid, epochs, start_time)
 
 
 # STEP #3
@@ -333,18 +341,6 @@ async def train(uuid, epochs, start_time):
         w_local = disturb_w(w_local)
     train_time = time.time() - train_start_time
 
-    # send local model to the committee leader
-    w_local_compressed = compress_data(convert_tensor_value_to_numpy(w_local))
-    body_data = {
-        'message': 'train_ready',
-        'uuid': str(uuid),
-        'epochs': epochs,
-        'w_compressed': w_local_compressed,
-        'start_time': start_time,
-        'train_time': train_time
-    }
-    await http_client_post(trigger_url, body_data)
-
     # send hash of local model to the ledger
     model_md5 = generate_md5_hash(w_local)
     body_data = {
@@ -355,7 +351,21 @@ async def train(uuid, epochs, start_time):
         'uuid': uuid,
         'epochs': epochs,
     }
-    await http_client_post(blockchain_server_url, body_data)
+    _, request_time = await http_client_post(blockchain_server_url, body_data)
+    add_communication_time(uuid, request_time)
+
+    # send local model to the committee leader
+    w_local_compressed = compress_data(convert_tensor_value_to_numpy(w_local))
+    body_data = {
+        'message': 'train_ready',
+        'uuid': str(uuid),
+        'epochs': epochs,
+        'w_compressed': w_local_compressed,
+        'start_time': start_time,
+        'train_time': train_time
+    }
+    _, request_time = await http_client_post(trigger_url, body_data)
+    add_communication_time(uuid, request_time)
 
 
 # STEP #4
@@ -418,7 +428,8 @@ async def calculate_acc_alpha(uuid, epochs):
         'epochs': epochs,
     }
     logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
-    result = await http_client_post(trigger_url, body_data)
+    result, request_time = await http_client_post(trigger_url, body_data)
+    add_communication_time(uuid, request_time)
     responseObj = json.loads(result)
     detail = responseObj.get("detail")
     global_model_compressed = detail.get("global_model")
@@ -463,14 +474,16 @@ async def calculate_acc_alpha(uuid, epochs):
         'epochs': epochs,
     }
     logger.debug('calculate acc-alpha map finished, send accuracy and alpha map to the ledger for uuid: ' + uuid)
-    await http_client_post(blockchain_server_url, body_data)
+    _, request_time = await http_client_post(blockchain_server_url, body_data)
+    add_communication_time(uuid, request_time)
     trigger_data = {
         'message': 'acc_alpha_map_ready',
         'epochs': epochs,
         'uuid': uuid,
         'test_time': test_time,
     }
-    await http_client_post(trigger_url, trigger_data)
+    _, request_time = await http_client_post(trigger_url, trigger_data)
+    add_communication_time(uuid, request_time)
 
 
 # count for STEP #5 the acc alpha map gathered
@@ -489,7 +502,8 @@ async def acc_alpha_map_count(epochs, uuid, test_time):
                 'message': 'CheckAccAlphaMapRead',
                 'epochs': epochs,
             }
-            response = await http_client_post(blockchain_server_url, trigger_data)
+            response, request_time = await http_client_post(blockchain_server_url, trigger_data)
+            add_communication_time(uuid, request_time)
             if response is not None:
                 break
             await gen.sleep(1)  # if dirty read happened, sleep for 1 second then retry.
@@ -519,7 +533,8 @@ async def round_finish(data, uuid, epochs):
         'uuid': uuid,
         'epochs': epochs,
     }
-    response = await http_client_post(trigger_url, fetch_data)
+    response, request_time = await http_client_post(trigger_url, fetch_data)
+    add_communication_time(uuid, request_time)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     start_time = detail.get("start_time")
@@ -552,7 +567,7 @@ async def round_finish(data, uuid, epochs):
     with open(filename, "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())
         total_time = time.time() - start_time
-        communication_time = total_time - train_time - test_time
+        communication_time = reset_communication_time(uuid)
         time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "]"
                                + " <Total Time> " + str(total_time)[:8]
                                + " <Train Time> " + str(train_time)[:8]
@@ -731,6 +746,24 @@ async def download_global_model(epochs):
     return detail
 
 
+def add_communication_time(uuid, request_time):
+    global my_communication_time
+    lock.acquire()
+    if str(uuid) not in my_communication_time:
+        my_communication_time[str(uuid)] = 0
+    my_communication_time[str(uuid)] += request_time
+    lock.release()
+
+
+def reset_communication_time(uuid):
+    global my_communication_time
+    lock.acquire()
+    communication_time = my_communication_time[str(uuid)]
+    my_communication_time[str(uuid)] = 0
+    lock.release()
+    return communication_time
+
+
 class TriggerHandler(web.RequestHandler):
 
     async def post(self):
@@ -741,14 +774,14 @@ class TriggerHandler(web.RequestHandler):
 
         message = data.get("message")
         if message == "train_ready":
-            await train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"), data.get("train_time"),
-                              data.get("w_compressed"))
+            asyncio.ensure_future(train_count(data.get("epochs"), data.get("uuid"), data.get("start_time"),
+                                              data.get("train_time"), data.get("w_compressed")))
         elif message == "global_model":
             detail = await download_global_model(data.get("epochs"))
         elif message == "acc_alpha_map_ready":
-            await acc_alpha_map_count(data.get("epochs"), data.get("uuid"), data.get("test_time"))
+            asyncio.ensure_future(acc_alpha_map_count(data.get("epochs"), data.get("uuid"), data.get("test_time")))
         elif message == "next_round_count":
-            await next_round_count(data.get("epochs"))
+            asyncio.ensure_future(next_round_count(data.get("epochs")))
         elif message == "fetch_time":
             detail = await fetch_time(data.get("uuid"), data.get("epochs"))
 

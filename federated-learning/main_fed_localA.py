@@ -52,6 +52,7 @@ dataset_test = None
 dict_users = []
 test_users = []
 skew_users = []
+my_communication_time = {}
 g_start_time = {}
 g_train_time = {}
 g_train_global_model = None
@@ -76,15 +77,18 @@ async def http_client_post(url, body_data):
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
+    request_start_time = time.time()
     try:
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
         logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
-        return response.body
+        request_time = time.time() - request_start_time
+        return response.body, request_time
     except Exception as e:
+        request_time = time.time() - request_start_time
         logger.error("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
-        return None
+        return None, request_time
 
 
 # init: loads the dataset and global model
@@ -126,7 +130,8 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
             'epochs': -1,
         }
         logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
-        result = await http_client_post(trigger_url, body_data)
+        result, request_time = await http_client_post(trigger_url, body_data)
+        add_communication_time(user_id, request_time)
         responseObj = json.loads(result)
         detail = responseObj.get("detail")
         global_model_compressed = detail.get("global_model")
@@ -309,7 +314,7 @@ async def load_user_id():
     return detail
 
 
-async def release_global_w(epochs):
+async def release_global_w(leader_user_id, epochs):
     lock.acquire()
     global g_user_id
     global wMap
@@ -335,7 +340,8 @@ async def release_global_w(epochs):
             'start_time': start_time,
         }
         my_url = "http://" + ipMap[user_id] + ":" + str(fed_listen_port) + "/trigger"
-        asyncio.ensure_future(http_client_post(my_url, data))
+        _, request_time = await http_client_post(my_url, data)
+        add_communication_time(leader_user_id, request_time)  # the communication time of leader may high
 
 
 async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_locals_per, hyperpara, start_time):
@@ -363,14 +369,14 @@ async def average_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_lo
     lock.release()
     if len(wMap) == args.num_users:
         logger.debug("Gathered enough w, average and release them")
-        asyncio.ensure_future(release_global_w(epochs))
+        asyncio.ensure_future(release_global_w(user_id, epochs))
 
 
 async def fetch_user_id():
     fetch_data = {
         'message': 'fetch_user_id',
     }
-    response = await http_client_post(trigger_url, fetch_data)
+    response, _ = await http_client_post(trigger_url, fetch_data)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     user_id = detail.get("user_id")
@@ -392,7 +398,8 @@ async def upload_local_w(user_id, epochs, from_ip, w_glob_local, w_locals, w_loc
         'from_ip': from_ip,
         'start_time': start_time,
     }
-    await http_client_post(trigger_url, upload_data)
+    _, request_time = await http_client_post(trigger_url, upload_data)
+    add_communication_time(user_id, request_time)
     return
 
 
@@ -450,6 +457,25 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+def add_communication_time(uuid, request_time):
+    global my_communication_time
+    lock.acquire()
+    if str(uuid) not in my_communication_time:
+        my_communication_time[str(uuid)] = 0
+    my_communication_time[str(uuid)] += request_time
+    print("########### REQUEST TIME ############", request_time)
+    lock.release()
+
+
+def reset_communication_time(uuid):
+    global my_communication_time
+    lock.acquire()
+    communication_time = my_communication_time[str(uuid)]
+    my_communication_time[str(uuid)] = 0
+    lock.release()
+    return communication_time
 
 
 def get_ip():

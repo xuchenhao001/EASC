@@ -36,6 +36,7 @@ fed_listen_port = 8888
 
 # NOT TO TOUCH VARIABLES BELOW
 trigger_url = ""
+next_round_count_num = 0
 peer_address_list = []
 g_user_id = 0
 lock = threading.Lock()
@@ -48,6 +49,7 @@ dataset_test = None
 dict_users = []
 test_users = []
 skew_users = []
+my_communication_time = {}
 g_start_time = {}
 g_train_time = {}
 g_train_global_model = None
@@ -68,15 +70,18 @@ async def http_client_post(url, body_data):
     method = "POST"
     headers = {'Content-Type': 'application/json; charset=UTF-8'}
     http_client = httpclient.AsyncHTTPClient()
+    request_start_time = time.time()
     try:
         request = httpclient.HTTPRequest(url=url, method=method, headers=headers, body=json_body, connect_timeout=300,
                                          request_timeout=300)
         response = await http_client.fetch(request)
         logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
-        return response.body
+        request_time = time.time() - request_start_time
+        return response.body, request_time
     except Exception as e:
+        request_time = time.time() - request_start_time
         logger.error("[HTTP Error] [" + body_data['message'] + "] from " + url + " ERROR DETAIL: %s" % e)
-        return None
+        return None, request_time
 
 
 # init: loads the dataset and global model
@@ -106,7 +111,7 @@ def init():
     g_train_global_model_epoch = -1  # -1 means the initial global model
 
 
-async def train(user_id, w_glob, epochs):
+async def train(user_id, w_glob_compressed, epochs):
     start_time = time.time()
     if user_id is None:
         user_id = await fetch_user_id()
@@ -115,6 +120,7 @@ async def train(user_id, w_glob, epochs):
         epochs = args.epochs
     else:
         # load w_glob as net_glob
+        w_glob = conver_numpy_value_to_tensor(decompress_data(w_glob_compressed))
         net_glob.load_state_dict(w_glob)
         net_glob.eval()
 
@@ -127,7 +133,8 @@ async def train(user_id, w_glob, epochs):
             'epochs': -1,
         }
         logger.debug('fetch global model of epoch [%s] from: %s' % (epochs, trigger_url))
-        result = await http_client_post(trigger_url, body_data)
+        result, request_time = await http_client_post(trigger_url, body_data)
+        add_communication_time(user_id, request_time)
         responseObj = json.loads(result)
         detail = responseObj.get("detail")
         global_model_compressed = detail.get("global_model")
@@ -168,8 +175,10 @@ async def train(user_id, w_glob, epochs):
     await upload_local_w(user_id, epochs, w, from_ip, start_time, train_time)
 
 
-async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
-    w_glob = conver_numpy_value_to_tensor(decompress_data(w_glob))
+async def gathered_global_w(user_id, epochs, compressed_w_glob, start_time, train_time):
+    global g_train_global_model
+    g_train_global_model = compressed_w_glob
+    w_glob = conver_numpy_value_to_tensor(decompress_data(compressed_w_glob))
     net_glob.load_state_dict(w_glob)
     net_glob.eval()
 
@@ -212,10 +221,12 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
     # start next round of train
     new_epochs = epochs - 1
     if new_epochs > 0:
-        # reset a new time for next round
-        logger.info("SLEEP FOR A WHILE...")
-        await gen.sleep(20)
-        asyncio.ensure_future(train(user_id, w_glob, new_epochs))
+        body_data = {
+            'message': 'next_round_count',
+            'user_id': user_id,
+            'epochs': new_epochs,
+        }
+        await http_client_post(trigger_url, body_data)
     else:
         logger.info("########## ALL DONE! ##########")
         asyncio.ensure_future(my_exit())
@@ -224,6 +235,31 @@ async def gathered_global_w(user_id, epochs, w_glob, start_time, train_time):
 async def my_exit():
     await gen.sleep(600)  # sleep 600 seconds before exit
     os._exit(0)
+
+
+async def next_round_count(leader_user_id, epochs):
+    global next_round_count_num
+    lock.acquire()
+    next_round_count_num += 1
+    lock.release()
+    if next_round_count_num == args.num_users:
+        # reset counts
+        lock.acquire()
+        next_round_count_num = 0
+        lock.release()
+        # sleep 20 seconds before trigger next round
+        logger.info("SLEEP FOR A WHILE...")
+        await gen.sleep(20)
+        # START NEXT ROUND
+        for user_id in ipMap.keys():
+            body_data = {
+                'message': 'continue_train',
+                'user_id': user_id,
+                'epochs': epochs,
+            }
+            my_url = "http://" + ipMap[user_id] + ":" + str(fed_listen_port) + "/trigger"
+            _, request_time = await http_client_post(my_url, body_data)
+            add_communication_time(leader_user_id, request_time)  # the communication time of leader may high
 
 
 class MultiTrainThread(threading.Thread):
@@ -252,7 +288,7 @@ async def load_user_id():
     return detail
 
 
-async def release_global_w(epochs):
+async def release_global_w(leader_user_id, epochs):
     lock.acquire()
     global g_user_id
     global wMap
@@ -274,7 +310,8 @@ async def release_global_w(epochs):
             'train_time': train_time,
         }
         my_url = "http://" + ipMap[user_id] + ":" + str(fed_listen_port) + "/trigger"
-        await http_client_post(my_url, data)
+        _, request_time = await http_client_post(my_url, data)
+        add_communication_time(leader_user_id, request_time)  # the communication time of leader may high
 
 
 async def average_local_w(user_id, epochs, w, from_ip, start_time, train_time):
@@ -294,14 +331,14 @@ async def average_local_w(user_id, epochs, w, from_ip, start_time, train_time):
     lock.release()
     if len(wMap) == args.num_users:
         logger.debug("Gathered enough w, average and release them")
-        asyncio.ensure_future(release_global_w(epochs))
+        asyncio.ensure_future(release_global_w(user_id, epochs))
 
 
 async def fetch_user_id():
     fetch_data = {
         'message': 'fetch_user_id',
     }
-    response = await http_client_post(trigger_url, fetch_data)
+    response, _ = await http_client_post(trigger_url, fetch_data)
     responseObj = json.loads(response)
     detail = responseObj.get("detail")
     user_id = detail.get("user_id")
@@ -320,7 +357,8 @@ async def upload_local_w(user_id, epochs, w, from_ip, start_time, train_time):
         'start_time': start_time,
         'train_time': train_time,
     }
-    await http_client_post(trigger_url, upload_data)
+    _, request_time = await http_client_post(trigger_url, upload_data)
+    add_communication_time(user_id, request_time)
     return
 
 
@@ -380,6 +418,25 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+def add_communication_time(uuid, request_time):
+    global my_communication_time
+    lock.acquire()
+    if str(uuid) not in my_communication_time:
+        my_communication_time[str(uuid)] = 0
+    my_communication_time[str(uuid)] += request_time
+    print("########### REQUEST TIME ############", request_time)
+    lock.release()
+
+
+def reset_communication_time(uuid):
+    global my_communication_time
+    lock.acquire()
+    communication_time = my_communication_time[str(uuid)]
+    my_communication_time[str(uuid)] = 0
+    lock.release()
+    return communication_time
+
+
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -416,11 +473,15 @@ class MainHandler(web.RequestHandler):
         elif message == "global_model":
             detail = await download_global_model(data.get("epochs"))
         elif message == "upload_local_w":
-            await average_local_w(data.get("user_id"), data.get("epochs"), data.get("w"), data.get("from_ip"),
-                                  data.get("start_time"), data.get("train_time"))
+            asyncio.ensure_future(average_local_w(data.get("user_id"), data.get("epochs"), data.get("w"),
+                                                  data.get("from_ip"), data.get("start_time"), data.get("train_time")))
         elif message == "release_global_w":
-            await gathered_global_w(data.get("user_id"), data.get("epochs"), data.get("w_glob"),
-                                    data.get("start_time"), data.get("train_time"))
+            asyncio.ensure_future(gathered_global_w(data.get("user_id"), data.get("epochs"), data.get("w_glob"),
+                                    data.get("start_time"), data.get("train_time")))
+        elif message == "next_round_count":
+            asyncio.ensure_future(next_round_count(data.get("user_id"), data.get("epochs")))
+        elif message == "continue_train":
+            asyncio.ensure_future(train(data.get("user_id"), g_train_global_model, data.get("epochs")))
 
         response = {"status": status, "detail": detail}
         in_json = json.dumps(response, sort_keys=True, indent=4, ensure_ascii=False).encode('utf8')
