@@ -424,7 +424,6 @@ def add_communication_time(uuid, request_time):
     if str(uuid) not in my_communication_time:
         my_communication_time[str(uuid)] = 0
     my_communication_time[str(uuid)] += request_time
-    print("########### REQUEST TIME ############", request_time)
     lock.release()
 
 
