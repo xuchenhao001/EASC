@@ -251,7 +251,7 @@ async def train(user_id, epochs, w_glob_local, w_locals, w_locals_per, hyperpara
         with open(filename, "a") as time_record_file:
             current_time = time.strftime("%H:%M:%S", time.localtime())
             total_time = time.time() - start_time
-            communication_time = total_time - train_time - test_time
+            communication_time = reset_communication_time(user_id)
             if communication_time < 0.001:
                 communication_time = 0.0
             time_record_file.write(current_time + "[" + f"{iter + 1:0>2}" + "]"
