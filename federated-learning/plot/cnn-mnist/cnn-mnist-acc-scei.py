@@ -37,6 +37,7 @@ axes.set_ylabel("Mean of Local Test Accuracy (%)", **csXYLabelFont)
 
 plt.xticks(family='Times New Roman', fontsize=15)
 plt.yticks(family='Times New Roman', fontsize=15)
+plt.tight_layout()
 plt.ylim(90, 100)
 plt.legend(prop=legendFont)
 plt.grid()
