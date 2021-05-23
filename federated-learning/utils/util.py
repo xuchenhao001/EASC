@@ -4,11 +4,14 @@
 import logging
 import os
 
+import numpy as np
+import torch
+import torchvision
 from torchvision import datasets, transforms
 
 from datasets.REALWORLD import REALWORLDDataset
 from datasets.UCI import UCIDataset
-from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP
+from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP, MobileNet
 from utils.sampling import mnist_iid, cifar_iid, noniid_onepass
 
 
@@ -122,6 +125,26 @@ def dataset_loader(dataset_name, isIID, num_users):
         else:
             dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, num_users,
                                                                 dataset_name='realworld')
+
+    elif dataset_name == 'flowers':
+        # https://arxiv.org/pdf/1704.04861.pdf
+        # http://download.tensorflow.org/example_images/flower_photos.tgz
+        flowers_data_path = os.path.join(real_path, "../../data/flower_photos/")
+        train_transform = transforms.Compose(
+            [transforms.RandomResizedCrop(64), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+        dataset = torchvision.datasets.ImageFolder(root=flowers_data_path, transform=train_transform)
+        len_train = int(0.8 * len(dataset))
+        len_test = len(dataset) - len_train
+        dataset_train, dataset_test = torch.utils.data.random_split(dataset, [len_train, len_test])
+        dataset_train.targets = np.array(dataset_train.dataset.targets)[dataset_train.indices].tolist()
+        dataset_test.targets = np.array(dataset_test.dataset.targets)[dataset_test.indices].tolist()
+        if isIID:
+            dict_users = cifar_iid(dataset_train, num_users)
+        else:
+            dict_users, test_users, skew_users = noniid_onepass(dataset_train, dataset_test, num_users,
+                                                                dataset_name='flowers')
+
     return dataset_train, dataset_test, dict_users, test_users, skew_users
 
 
@@ -137,6 +160,8 @@ def model_loader(model_name, dataset_name, device, num_channels, num_classes, im
         net_glob = UCI_CNN(n_class=6).to(device)
     elif model_name == 'cnn' and dataset_name == 'realworld':
         net_glob = UCI_CNN(n_class=8).to(device)
+    elif model_name == 'mobilenet':
+        net_glob = MobileNet().to(device)
     elif model_name == 'mlp':
         len_in = 1
         for x in img_size:

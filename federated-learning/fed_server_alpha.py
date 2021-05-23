@@ -289,8 +289,8 @@ async def train(uuid, epochs, start_time):
     if epochs == total_epochs:
         net_glob.eval()
         idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
-        correct = test_img_total(net_glob, dataset_test, idx_total, args)
-        acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
+        acc_list, _ = test_img_total(net_glob, dataset_test, idx_total, args)
+        acc_local = acc_list[0]
         filename = "result-record_" + uuid + ".txt"
         # first time clean the file
         open(filename, 'w').close()
@@ -526,16 +526,12 @@ async def round_finish(data, uuid, epochs):
     test_addition_start_time = time.time()
     idx = int(uuid) - 1
     idx_total = [test_users[idx], skew_users[0][idx], skew_users[1][idx], skew_users[2][idx], skew_users[3][idx]]
-    correct = test_img_total(net_glob, dataset_test, idx_total, args)
-    acc_local = torch.div(100.0 * correct[0], len(test_users[idx]))
-    # skew 5%
-    acc_local_skew1 = torch.div(100.0 * (correct[0] + correct[1]), (len(test_users[idx]) + len(skew_users[0][idx])))
-    # skew 10%
-    acc_local_skew2 = torch.div(100.0 * (correct[0] + correct[2]), (len(test_users[idx]) + len(skew_users[1][idx])))
-    # skew 15%
-    acc_local_skew3 = torch.div(100.0 * (correct[0] + correct[3]), (len(test_users[idx]) + len(skew_users[2][idx])))
-    # skew 20%
-    acc_local_skew4 = torch.div(100.0 * (correct[0] + correct[4]), (len(test_users[idx]) + len(skew_users[3][idx])))
+    acc_list, _ = test_img_total(net_glob, dataset_test, idx_total, args)
+    acc_local = acc_list[0]
+    acc_local_skew1 = acc_list[1]
+    acc_local_skew2 = acc_list[2]
+    acc_local_skew3 = acc_list[3]
+    acc_local_skew4 = acc_list[4]
     test_addition_time = time.time() - test_addition_start_time
     test_time += test_addition_time
 

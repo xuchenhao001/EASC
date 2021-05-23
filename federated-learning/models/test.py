@@ -36,35 +36,11 @@ def test_img(net_g, dataset_test, test_indices, args):
 
 
 def test_img_total(net_g, dataset_test, idx_list, args):
-    net_g.eval()
-    subset_idx = [0]
-    idx_total = []
+    accuracy_list = []
+    test_loss_list = []
     for i in range(len(idx_list)):
-        subset_idx.append(subset_idx[-1] + len(idx_list[i]))
-        idx_total += idx_list[i]
+        accuracy, test_loss = test_img(net_g, dataset_test, idx_list[i], args)
+        accuracy_list.append(accuracy)
+        test_loss_list.append(test_loss)
 
-    test_loss = [0] * len(idx_list)
-    correct = [0] * len(idx_list)
-
-    dataset = DatasetSplit(dataset_test, idx_total)
-    data_loader = DataLoader(dataset, batch_size=args.bs)
-
-    y_target = []
-    y_pred = []
-    for idx, (data, target) in enumerate(data_loader):
-        data = data.detach().clone().type(torch.FloatTensor)
-        if args.gpu != -1:
-            data, target = data.to(args.device), target.to(args.device)
-        log_probs = net_g(data)
-        y_target.append(target)
-        pred = log_probs.data.max(1, keepdim=True)[1]
-        y_pred.append(pred)
-
-    y_target = torch.cat(y_target)
-    y_pred = torch.cat(y_pred)
-    y_pred = y_pred.squeeze(1)
-
-    for i in range(len(idx_list)):
-        correct[i] = sum(y_target[subset_idx[i]:subset_idx[i + 1]] == y_pred[subset_idx[i]:subset_idx[i + 1]])
-
-    return correct
+    return accuracy_list, test_loss_list

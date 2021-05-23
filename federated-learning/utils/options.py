@@ -17,7 +17,7 @@ def args_parser():
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
     parser.add_argument('--split', type=str, default='user', help="train-test split type, user or sample")
 
-    # model arguments, support model: "cnn", "mlp"
+    # model arguments, support model: "cnn", "mlp", "mobilenet"
     parser.add_argument('--model', type=str, default='cnn', help='model name')
     # parser.add_argument('--model', type=str, default='mlp', help='model name')
     parser.add_argument('--kernel_num', type=int, default=9, help='number of each kind of kernel')
@@ -29,8 +29,8 @@ def args_parser():
                         help="Whether use max pooling rather than strided convolutions")
     parser.add_argument('--hyper', type=float, default=0.3, help='hypermeter alpha')
 
-    # support dataset: "cifar", "mnist", "uci", "realworld"
-    parser.add_argument('--dataset', type=str, default='realworld', help="name of dataset")
+    # support dataset: "cifar", "mnist", "uci", "realworld", "flowers"
+    parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
     parser.add_argument('--hyperpara', type=float, default=0.75, help="hyperpara alpha")
     parser.add_argument('--iid', action='store_true', help='whether i.i.d or not')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
