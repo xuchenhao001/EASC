@@ -8,6 +8,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+from matplotlib import cycler
 
 x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
      32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
@@ -22,10 +23,12 @@ legendFont = font_manager.FontProperties(family='Times New Roman', weight='bold'
 xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
 csXYLabelFont = {'fontproperties': xylabelFont}
 
+markers = ["D", "o", "^", "s", "*", "X", "d", "x", "1", "|"]
+axes.set_prop_cycle(cycler(color=plt.get_cmap('tab10').colors, marker=markers))
 axes.plot(x, fed_server, label="SCEI with negotiated α", linewidth=3)
-axes.plot(x, main_nn, label="Local Training", linestyle='--', alpha=0.5)
-axes.plot(x, main_fed_localA, label="APFL", linestyle='--', alpha=0.5)
-axes.plot(x, main_fed, label="FedAvg", linestyle='--', alpha=0.5)
+axes.plot(x, main_nn, label="Local Training", alpha=0.5)
+axes.plot(x, main_fed_localA, label="APFL", alpha=0.5)
+axes.plot(x, main_fed, label="FedAvg", alpha=0.5)
 # axes.plot(x, scei, label="SCEI with negotiated α", linewidth=3, color='#1f77b4')
 
 
