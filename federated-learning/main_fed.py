@@ -200,7 +200,7 @@ async def gathered_global_w(user_id, epochs, compressed_w_glob, start_time, trai
     with open(filename, "a") as time_record_file:
         current_time = time.strftime("%H:%M:%S", time.localtime())
         total_time = time.time() - start_time
-        communication_time = total_time - train_time - test_time
+        communication_time = reset_communication_time(user_id)
         time_record_file.write(current_time + "[" + f"{epochs:0>2}" + "]"
                                + " <Total Time> " + str(total_time)[:8]
                                + " <Train Time> " + str(train_time)[:8]
