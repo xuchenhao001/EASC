@@ -20,19 +20,26 @@ def extract_final_value(path, column_num):
     return choose_value
 
 
+# extract the final value from specific results column
+def extract_late_rounds_value(path, from_round_num, column_num):
+    df = pd.read_csv(path)
+    choose_value = df.iloc[:, column_num].iloc[from_round_num:]
+    return list(choose_value)
+
+
 def extract_series_data():
     model_name = "cnn"
     dataset_name = "uci"
     # experiment accuracy: column No.5
     # communication time: column No.3
     # total communication time: column No.0
-    column_num = 5
+    column_num = 0
 
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "fed_server_alpha_025", "fed_server_alpha_050", "fed_server_alpha_075", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed"]
-    # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
-    experiment_names = ["fed_server"]
+    experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
+    # experiment_names = ["fed_server"]
 
     for path, dirs, files in os.walk("./output"):
         if path.endswith(model_name + "-" + dataset_name):
@@ -43,34 +50,43 @@ def extract_series_data():
 
 
 def extract_skew_data():
-    model_name = "cnn"
-    dataset_name = "realworld"
+    model_name = "mlp"
+    dataset_name = "mnist"
 
-    experiment_names = ["main_nn", "main_fed_localA", "fed_server", "main_fed"]
-    # column_nums = [5, 5, 5, 5]  # for acc_local columns
-    column_nums = [3, 4, 5, 4]  # for acc_local columns
+    experiment_names = ["fed_server", "main_nn", "main_fed_localA", "main_fed"]
+    column_num = 5  # for acc_local columns
+    skew_data_from_round = 20
 
     experiment_results = []
     for path, dirs, files in os.walk("./output"):
         if path.endswith(model_name + "-" + dataset_name):
             for i in range(len(experiment_names)):
                 result_file = os.path.join(path, experiment_names[i], "merged.csv")
-                result_no_skew = extract_final_value(result_file, column_nums[i])
-                result_skew_05 = extract_final_value(result_file, column_nums[i] + 1)
-                result_skew_10 = extract_final_value(result_file, column_nums[i] + 2)
-                result_skew_15 = extract_final_value(result_file, column_nums[i] + 3)
-                result_skew_20 = extract_final_value(result_file, column_nums[i] + 4)
-                experiment_results.append([result_no_skew, result_skew_05, result_skew_10,
+                # result_no_skew = extract_late_rounds_value(result_file, 20, column_num)
+                result_skew_05 = extract_late_rounds_value(result_file, skew_data_from_round, column_num + 1)
+                result_skew_10 = extract_late_rounds_value(result_file, skew_data_from_round, column_num + 2)
+                result_skew_15 = extract_late_rounds_value(result_file, skew_data_from_round, column_num + 3)
+                result_skew_20 = extract_late_rounds_value(result_file, skew_data_from_round, column_num + 4)
+                experiment_results.append([result_skew_05, result_skew_10,
                                            result_skew_15, result_skew_20])
 
     print(model_name, "-", dataset_name)
+    print("skew 05:")
     for i in range(len(experiment_names)):
-        print(experiment_names[i], end='\t')
+        print(experiment_names[i], "=", experiment_results[i][0])
     print()
-    for j in range(len(experiment_results[0])):
-        for i in range(len(experiment_names)):
-            print(experiment_results[i][j], end='\t')
-        print()
+    print("skew 10:")
+    for i in range(len(experiment_names)):
+        print(experiment_names[i], "=", experiment_results[i][1])
+    print()
+    print("skew 15:")
+    for i in range(len(experiment_names)):
+        print(experiment_names[i], "=", experiment_results[i][2])
+    print()
+    print("skew 20:")
+    for i in range(len(experiment_names)):
+        print(experiment_names[i], "=", experiment_results[i][3])
+    print()
 
 
 def main():
