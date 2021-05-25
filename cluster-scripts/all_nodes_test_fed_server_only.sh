@@ -56,13 +56,13 @@ function main() {
             # clean
             clean
             # run test
-            ./restart_fed_server.sh ${schema[0]} ${schema[1]}
+            ./restart_fed_server.sh ${schema[0]} ${schema[1]} "0.1" "0.9" "20"
             sleep 60
             curl -i -X GET 'http://localhost:8888/messages'
             # detect test finish or not
             testFinish "[f]ed_server.py"
             # gather output, move to the right directory
-            arrangeOutput ${schema[0]} ${schema[1]} "fed_server" "0.1" "0.9" "20"
+            arrangeOutput ${schema[0]} ${schema[1]} "fed_server" 
             echo "[`date`] ## fed_server done ##"
         fi
     done
