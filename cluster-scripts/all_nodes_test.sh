@@ -56,7 +56,7 @@ function main() {
             # clean
             clean
             # run test
-            ./restart_fed_server.sh ${schema[0]} ${schema[1]}
+            ./restart_fed_server.sh ${schema[0]} ${schema[1]}  "0.5" "0.8" "10"
             sleep 60
             curl -i -X GET 'http://localhost:8888/messages'
             # detect test finish or not

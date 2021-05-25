@@ -31,12 +31,6 @@ logger = logging.getLogger("fed_server")
 # TO BE CHANGED
 # attackers' ids, must be string type "1", "2", ...
 attackers_id = []
-# alpha minimum
-hyperpara_min = 0.5
-# alpha maximum
-hyperpara_max = 0.8
-# rounds to negotiate alpha
-negotiate_round = 10
 # committee members proportion
 committee_proportion = 0.3
 # federated learning server listen port
@@ -442,8 +436,8 @@ async def calculate_acc_alpha(uuid, epochs):
     my_global_model_tensor = w_glob
 
     # test different alpha
-    negotiate_step = (hyperpara_max - hyperpara_min) / negotiate_round
-    negotiate_step_list = np.arange(hyperpara_min, hyperpara_max, negotiate_step)
+    negotiate_step = (args.hyperpara_max - args.hyperpara_min) / args.negotiate_round
+    negotiate_step_list = np.arange(args.hyperpara_min, args.hyperpara_max, negotiate_step)
     alpha_list = []
     acc_test_list = []
     test_start_time = time.time()

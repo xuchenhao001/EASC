@@ -32,8 +32,6 @@ logger = logging.getLogger("fed_server_alpha")
 # To change the static alpha, use utils/options: "hyperpara"
 # attackers' ids, must be string type "1", "2", ...
 attackers_id = []
-# rounds to negotiate alpha
-negotiate_round = 10
 # committee members proportion
 committee_proportion = 0.3
 # federated learning server listen port

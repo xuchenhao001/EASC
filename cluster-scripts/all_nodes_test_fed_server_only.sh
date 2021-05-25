@@ -62,7 +62,7 @@ function main() {
             # detect test finish or not
             testFinish "[f]ed_server.py"
             # gather output, move to the right directory
-            arrangeOutput ${schema[0]} ${schema[1]} "fed_server"
+            arrangeOutput ${schema[0]} ${schema[1]} "fed_server" "0.1" "0.9" "20"
             echo "[`date`] ## fed_server done ##"
         fi
     done

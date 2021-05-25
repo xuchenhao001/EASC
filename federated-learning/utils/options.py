@@ -32,6 +32,9 @@ def args_parser():
     # support dataset: "cifar", "mnist", "uci", "realworld", "flowers"
     parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
     parser.add_argument('--hyperpara', type=float, default=0.75, help="hyperpara alpha")
+    parser.add_argument('--hyperpara_min', type=float, default=0.5, help="hyperpara alpha min")
+    parser.add_argument('--hyperpara_max', type=float, default=0.8, help="hyperpara alpha max")
+    parser.add_argument('--negotiate_round', type=int, default=10, help="hyperpara negotiate round")
     parser.add_argument('--iid', action='store_true', help='whether i.i.d or not')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
     parser.add_argument('--num_channels', type=int, default=1, help="number of channels of imges")
