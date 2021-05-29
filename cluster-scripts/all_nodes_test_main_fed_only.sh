@@ -56,7 +56,7 @@ function main() {
             # clean
             clean
             # run test
-            ./restart_main_fed.sh ${schema[0]} ${schema[1]}
+            ./restart_main_fed.sh ${schema[0]} ${schema[1]} 200
             sleep 60
             # detect test finish or not
             testFinish "[m]ain_fed.py"
