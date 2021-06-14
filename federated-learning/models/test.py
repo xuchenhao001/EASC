@@ -38,9 +38,17 @@ def test_img(net_g, dataset_test, test_indices, args):
 def test_img_total(net_g, dataset_test, idx_list, args):
     accuracy_list = []
     test_loss_list = []
+    correct_test_local = 0
+    loss_test_local = 0
     for i in range(len(idx_list)):
-        accuracy, test_loss = test_img(net_g, dataset_test, idx_list[i], args)
-        accuracy_list.append(accuracy)
-        test_loss_list.append(test_loss)
+        correct_test, loss_test = test_img(net_g, dataset_test, idx_list[i], args)
+        if i == 0:
+            correct_test_local = correct_test
+            accuracy_list.append(100.0 * correct_test_local / len(idx_list[0]))
+            loss_test_local = loss_test
+            test_loss_list.append(100.0 * loss_test_local / len(idx_list[0]))
+        else:
+            accuracy_list.append(100.0 * (correct_test_local + correct_test) / (len(idx_list[0]) + len(idx_list[i])))
+            test_loss_list.append(100.0 * (loss_test_local + loss_test) / (len(idx_list[0]) + len(idx_list[i])))
 
     return accuracy_list, test_loss_list
