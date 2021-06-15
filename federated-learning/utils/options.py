@@ -30,7 +30,7 @@ def args_parser():
     parser.add_argument('--hyper', type=float, default=0.3, help='hypermeter alpha')
 
     # support dataset: "cifar", "mnist", "uci", "realworld", "flowers"
-    parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
+    parser.add_argument('--dataset', type=str, default='cifar', help="name of dataset")
     parser.add_argument('--hyperpara', type=float, default=0.75, help="hyperpara alpha")
     parser.add_argument('--hyperpara_min', type=float, default=0.5, help="hyperpara alpha min")
     parser.add_argument('--hyperpara_max', type=float, default=0.8, help="hyperpara alpha max")
