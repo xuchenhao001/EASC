@@ -42,7 +42,6 @@ def test_img_total(net_g, dataset_test, idx_list, args):
         if i == 0:
             correct_test_local = correct_test
             accuracy_local = 100.0 * correct_test_local / len(idx_list[0])
-            print("[test_img_total]%d\t%f\t%f\t%f" % (0, 100.0 * correct_test_local, len(idx_list[0]), accuracy_local))
             accuracy_list.append(accuracy_local)
             loss_test_local = loss_test
             loss_local = 100.0 * loss_test_local / len(idx_list[0])
@@ -52,6 +51,5 @@ def test_img_total(net_g, dataset_test, idx_list, args):
             accuracy_list.append(accuracy_skew)
             loss_skew = 100.0 * (loss_test_local + loss_test) / (len(idx_list[0]) + len(idx_list[i]))
             test_loss_list.append(loss_skew)
-            print("[test_img_total]%d\t%f\t%f\t%f" % (i, 100.0 * (correct_test_local + correct_test), (len(idx_list[0]) + len(idx_list[i])), accuracy_skew))
 
     return accuracy_list, test_loss_list
