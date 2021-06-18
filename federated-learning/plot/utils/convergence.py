@@ -33,3 +33,24 @@ def plot_convergence_skew(title, network_5_node, network_10_node, network_20_nod
     plt.grid()
     plt.show()
 
+
+def plot_main_fed_convergence(title, main_fed):
+    x = range(len(main_fed))
+    fig, axes = plt.subplots()
+    legendFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=15)
+    xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
+    titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
+    csXYLabelFont = {'fontproperties': xylabelFont}
+    csTitleFont = {'fontproperties': titleFont}
+    # markers = ["D", "o", "^", "s", "*", "X", "d", "x", "1", "|"]
+    axes.set_prop_cycle(cycler(color=plt.get_cmap('tab10').colors))
+    axes.plot(x, main_fed, label="FedAVG")
+    axes.set_xlabel("Training Rounds", **csXYLabelFont)
+    axes.set_ylabel("Mean of Local Test Accuracy (%)", **csXYLabelFont)
+    plt.title(title, **csTitleFont)
+    plt.xticks(family='Times New Roman', fontsize=15)
+    plt.yticks(family='Times New Roman', fontsize=15)
+    plt.tight_layout()
+    plt.legend(prop=legendFont)
+    plt.grid()
+    plt.show()
