@@ -5,6 +5,7 @@
 # sudo apt-get install msttcorefonts
 # rm -rf ~/.cache/matplotlib
 # ```
+import sys
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
@@ -45,4 +46,8 @@ plt.tight_layout()
 plt.ylim(40)
 plt.legend(prop=legendFont)
 plt.grid()
-plt.show()
+if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
+    plt.savefig(sys.argv[2])
+else:
+    plt.show()
+

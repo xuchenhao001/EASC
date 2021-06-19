@@ -1,3 +1,5 @@
+import sys
+
 from plot.utils.skew import plot_skew
 
 fed_server = [47.45, 47.59, 47.73, 47.41, 47.5, 48.41, 48.09, 48.0, 48.32, 47.95, 48.36, 48.73, 48.32, 48.23, 47.86, 48.41, 48.14, 48.05, 48.59, 48.23, 48.18, 48.14, 48.68, 48.91, 48.77, 48.36, 48.27, 48.41, 48.27, 48.68]
@@ -6,4 +8,9 @@ main_fed_localA = [47.0, 47.27, 47.05, 47.09, 46.91, 47.05, 47.09, 46.95, 47.09,
 main_fed = [38.82, 39.0, 40.0, 40.05, 40.73, 40.45, 40.73, 40.32, 41.59, 41.91, 41.41, 41.36, 41.5, 41.64, 41.5, 42.0, 41.05, 41.95, 41.36, 40.86, 41.27, 40.91, 40.64, 41.27, 41.18, 42.09, 41.59, 41.64, 41.77, 42.05]
 
 data = {'SCEI': fed_server, 'Local': main_nn, 'APFL': main_fed_localA, 'FedAvg': main_fed}
-plot_skew(data)
+
+save_path = None
+if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
+    save_path = sys.argv[2]
+
+plot_skew(data, save_path)

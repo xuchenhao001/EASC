@@ -14,7 +14,7 @@ import pandas as pd
 # main_fed = []
 # data = {'SCEI': fed_server, 'Local': main_nn, 'APFL': main_fed_localA, 'FedAvg': main_fed}
 
-def plot_skew(data):
+def plot_skew(data, save_path):
     df = pd.DataFrame.from_dict(data=data)
 
     fig, axes = plt.subplots()
@@ -27,13 +27,20 @@ def plot_skew(data):
         patch.set_facecolor(color)
 
     # legendFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=15)
-    xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
+    titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=25)
+    csTitleFont = {'fontproperties': titleFont}
+    xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=25)
     csXYLabelFont = {'fontproperties': xylabelFont}
     plt.xlabel("Models", **csXYLabelFont)
-    plt.ylabel("Mean of Local Test Accuracy (%)", **csXYLabelFont)
-    plt.xticks(family='Times New Roman', fontsize=15)
-    plt.yticks(family='Times New Roman', fontsize=15)
+    plt.ylabel("Mean Local Test ACC (%)", **csXYLabelFont)
+    # plt.title(title, **csTitleFont)
+    plt.xticks(family='Times New Roman', weight='bold', fontsize=22)
+    plt.yticks(family='Times New Roman', weight='bold', fontsize=22)
     plt.tight_layout()
     # plt.legend(prop=legendFont)
     plt.grid()
-    plt.show()
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()
+
