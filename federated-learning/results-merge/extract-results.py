@@ -28,19 +28,19 @@ def extract_late_rounds_value(path, from_round_num, column_num):
 
 
 def extract_series_data():
-    exp_node_number = "20-nodes"
-    model_name = "mlp"
-    dataset_name = "mnist"
+    exp_node_number = "10-nodes"
+    model_name = "cnn"
+    dataset_name = "realworld"
     # experiment accuracy: column No.5
     # communication time: column No.3
-    # total communication time: column No.0
+    # total time: column No.0
     column_num = 5
 
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "fed_server_alpha_025", "fed_server_alpha_050", "fed_server_alpha_075", "main_fed", "main_nn"]
     # experiment_names = ["fed_server", "main_fed_localA", "main_fed"]
-    # experiment_names = ["fed_server", "main_fed_localA", "main_fed", "main_nn"]
     experiment_names = ["fed_server"]
+    # experiment_names = ["main_fed"]
 
     for path, dirs, files in os.walk("./output"):
         if path.endswith(model_name + "-" + dataset_name) and exp_node_number in path:
@@ -51,6 +51,7 @@ def extract_series_data():
 
 
 def extract_skew_data():
+    exp_node_number = "10-nodes"
     model_name = "mlp"
     dataset_name = "mnist"
 
@@ -60,7 +61,7 @@ def extract_skew_data():
 
     experiment_results = []
     for path, dirs, files in os.walk("./output"):
-        if path.endswith(model_name + "-" + dataset_name):
+        if path.endswith(model_name + "-" + dataset_name) and exp_node_number in path:
             for i in range(len(experiment_names)):
                 result_file = os.path.join(path, experiment_names[i], "merged.csv")
                 # result_no_skew = extract_late_rounds_value(result_file, 20, column_num)

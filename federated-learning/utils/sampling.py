@@ -59,7 +59,7 @@ def get_indices(labels, user_labels, n_samples):
     return indices
 
 
-def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist', kept_class=3):
+def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist', kept_class=4):
     train_users = {}
     test_users = {}
     skew_users1 = {}
