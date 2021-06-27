@@ -23,6 +23,9 @@ fig, axes = plt.subplots()
 legendFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=15)
 xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
 csXYLabelFont = {'fontproperties': xylabelFont}
+titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
+csTitleFont = {'fontproperties': titleFont}
+plt.title("No Skew (α=0.5~0.8)", **csTitleFont)
 
 markers = ["D", "o", "^", "s", "*", "X", "d", "x", "1", "|"]
 axes.set_prop_cycle(cycler(color=plt.get_cmap('tab10').colors, marker=markers))
@@ -37,7 +40,7 @@ axes.set_ylabel("Mean of Local Test Accuracy (%)", **csXYLabelFont)
 plt.xticks(family='Times New Roman', fontsize=15)
 plt.yticks(family='Times New Roman', fontsize=15)
 plt.tight_layout()
-plt.ylim(40)
+plt.ylim(30)
 plt.legend(prop=legendFont)
 plt.grid()
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":

@@ -30,7 +30,7 @@ def extract_late_rounds_value(path, from_round_num, column_num):
 def extract_series_data():
     exp_node_number = "10-nodes"
     model_name = "cnn"
-    dataset_name = "realworld"
+    dataset_name = "cifar"
     # experiment accuracy: column No.5
     # communication time: column No.3
     # total time: column No.0
@@ -52,8 +52,8 @@ def extract_series_data():
 
 def extract_skew_data():
     exp_node_number = "10-nodes"
-    model_name = "mlp"
-    dataset_name = "mnist"
+    model_name = "cnn"
+    dataset_name = "realworld"
 
     experiment_names = ["fed_server", "main_nn", "main_fed_localA", "main_fed"]
     column_num = 5  # for acc_local columns
@@ -92,8 +92,8 @@ def extract_skew_data():
 
 
 def main():
-    extract_series_data()
-    # extract_skew_data()
+    # extract_series_data()
+    extract_skew_data()
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ import pandas as pd
 # main_fed = []
 # data = {'SCEI': fed_server, 'Local': main_nn, 'APFL': main_fed_localA, 'FedAvg': main_fed}
 
-def plot_skew(data, save_path):
+def plot_skew(title, data, save_path):
     df = pd.DataFrame.from_dict(data=data)
 
     fig, axes = plt.subplots()
@@ -31,6 +31,9 @@ def plot_skew(data, save_path):
     csTitleFont = {'fontproperties': titleFont}
     xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=25)
     csXYLabelFont = {'fontproperties': xylabelFont}
+    titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=25)
+    csTitleFont = {'fontproperties': titleFont}
+    plt.title(title, **csTitleFont)
     plt.xlabel("Models", **csXYLabelFont)
     plt.ylabel("Mean Local Test ACC (%)", **csXYLabelFont)
     # plt.title(title, **csTitleFont)
