@@ -10,4 +10,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_time_cost("Communication Cost", fed_server, main_fed, main_fed_localA, None, save_path)
+plot_time_cost("", fed_server, main_fed, main_fed_localA, None, save_path)

@@ -34,8 +34,8 @@ def plot_skew(title, data, save_path):
     titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=25)
     csTitleFont = {'fontproperties': titleFont}
     plt.title(title, **csTitleFont)
-    plt.xlabel("Models", **csXYLabelFont)
-    plt.ylabel("Mean Local Test ACC (%)", **csXYLabelFont)
+    plt.xlabel("Scheme", **csXYLabelFont)
+    plt.ylabel("Avg. Local Test Acc. (%)", **csXYLabelFont)
     # plt.title(title, **csTitleFont)
     plt.xticks(family='Times New Roman', weight='bold', fontsize=22)
     plt.yticks(family='Times New Roman', weight='bold', fontsize=22)

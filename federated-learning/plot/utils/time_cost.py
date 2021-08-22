@@ -25,7 +25,7 @@ def plot_time_cost(title, fed_server, main_fed, main_fed_localA, main_nn=None, s
     axes.plot(x, main_fed_localA, label="APFL", alpha=0.5)
     if main_nn:
         axes.plot(x, main_nn, label="Local Training", alpha=0.5)
-    axes.set_xlabel("Training Rounds", **csXYLabelFont)
+    axes.set_xlabel("Training Round", **csXYLabelFont)
     axes.set_ylabel("Time (s)", **csXYLabelFont)
     plt.title(title, **csTitleFont)
     plt.xticks(family='Times New Roman', fontsize=15)

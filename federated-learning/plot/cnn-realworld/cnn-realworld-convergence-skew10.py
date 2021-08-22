@@ -10,4 +10,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_convergence_skew("Skew 10%", network_5_node, network_10_node, network_20_node, save_path)
+plot_convergence_skew("", network_5_node, network_10_node, network_20_node, save_path)

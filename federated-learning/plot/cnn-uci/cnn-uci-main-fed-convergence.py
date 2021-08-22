@@ -8,4 +8,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_main_fed_convergence("No Skew", main_fed, save_path)
+plot_main_fed_convergence("", main_fed, save_path)

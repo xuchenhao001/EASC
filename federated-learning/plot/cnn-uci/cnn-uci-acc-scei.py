@@ -28,7 +28,7 @@ xylabelFont = font_manager.FontProperties(family='Times New Roman', weight='bold
 csXYLabelFont = {'fontproperties': xylabelFont}
 titleFont = font_manager.FontProperties(family='Times New Roman', weight='bold', style='normal', size=17)
 csTitleFont = {'fontproperties': titleFont}
-plt.title("No Skew (α=0.5~0.8)", **csTitleFont)
+# plt.title("No Skew (α=0.5~0.8)", **csTitleFont)
 
 markers = ["D", "o", "^", "s", "*", "X", "d", "x", "1", "|"]
 axes.set_prop_cycle(cycler(color=plt.get_cmap('tab10').colors, marker=markers))
@@ -40,8 +40,8 @@ axes.plot(x, fed_server_alpha_075, label="α=0.75",  alpha=0.5)
 axes.plot(x, main_nn, label="α=1.0 (i.e. Local Training)",  alpha=0.5)
 
 
-axes.set_xlabel("Training Rounds", **csXYLabelFont)
-axes.set_ylabel("Mean of Local Test Accuracy (%)", **csXYLabelFont)
+axes.set_xlabel("Training Round", **csXYLabelFont)
+axes.set_ylabel("Average Local Test Accuracy (%)", **csXYLabelFont)
 
 plt.xticks(family='Times New Roman', fontsize=15)
 plt.yticks(family='Times New Roman', fontsize=15)

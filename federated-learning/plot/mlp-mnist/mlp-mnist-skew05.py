@@ -13,4 +13,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_skew("Skew 5%", data, save_path)
+plot_skew("", data, save_path)
