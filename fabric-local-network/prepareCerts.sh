@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# set -x
 # release certs; clean logs; clean certs;
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
@@ -10,21 +11,6 @@ export VERBOSE=false
 source ./network.config
 source ./.env
 source scriptUtils.sh
-
-function releaseCerts() {
-  tar -zcf networkCache.tar.gz network-cache/
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
-    # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
-    if [[ $status != "ok" ]]; then
-      echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
-      exit 1
-    fi
-    scp networkCache.tar.gz ${HostUser}@${addrIN[0]}:~/EASC/fabric-samples/networkCache.tar.gz
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && tar -zxf networkCache.tar.gz"
-  done
-}
 
 function createOrgs() {
 
@@ -49,14 +35,14 @@ function createOrgs() {
     fatalln "Failed to generate certificates..."
   fi
 
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     prepareID org$((i+1)) Org$((i+1))MSP
   done
 
   echo
   echo "Generate CCP files for Orgs"
   ccpGenerate
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     prepareCCP org$((i+1))
   done
 }
@@ -78,8 +64,8 @@ function json_ccp {
 }
 
 function ccpGenerate() {
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
+  for i in "${!PEER_ADDRS[@]}"; do
+    addrIN=(${PEER_ADDRS[i]//:/ })
     echo "$(json_ccp $((i+1)) ${addrIN[0]} ${addrIN[1]} $((addrIN[1]+3)) network-cache/peerOrganizations/org$((i+1)).example.com/tlsca/tlsca.org$((i+1)).example.com-cert.pem network-cache/peerOrganizations/org$((i+1)).example.com/ca/ca.org$((i+1)).example.com-cert.pem)" > network-cache/peerOrganizations/org$((i+1)).example.com/connection-org$((i+1)).json
   done
 }
@@ -174,8 +160,8 @@ function checkPrereqs() {
 #################################
 
 function generatePeerDockerCompose() {
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
+  for i in "${!PEER_ADDRS[@]}"; do
+    addrIN=(${PEER_ADDRS[i]//:/ })
     echo "$(prepareDockerCompose $((i+1)) ${addrIN[0]} ${addrIN[1]} $((addrIN[1]+1)))" > network-cache/docker-compose-org$((i+1)).yaml
   done
 }
@@ -210,8 +196,8 @@ function prepareCoreConfig() {
 ##########################
 function generateConfigTX() {
   ORGS_DETAIL=""
-  for i in "${!PeerAddress[@]}"; do
-      addrIN=(${PeerAddress[i]//:/ })
+  for i in "${!PEER_ADDRS[@]}"; do
+      addrIN=(${PEER_ADDRS[i]//:/ })
       ORGS_DETAIL=$(echo -e "$ORGS_DETAIL\n$(parseOrgDetail $((i+1)) ${addrIN[0]} ${addrIN[1]})")
   done
   ORGS_DETAIL=$(echo "$ORGS_DETAIL" | awk '{printf "%s\\n", $0}' | sed 's/\\n//')
@@ -220,18 +206,18 @@ function generateConfigTX() {
   ORGS_DETAIL=$(echo "$ORGS_DETAIL" | sed 's/\//\\\//g')
 
   ORGSLIST1=""
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     ORGSLIST1=$(echo "$ORGSLIST1 \n                    - *Org$((i+1))")
   done
   ORGSLIST1=$(echo "$ORGSLIST1" | sed 's/\\n //')
 
   ORGSLIST2=""
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     ORGSLIST2=$(echo "$ORGSLIST2 \n                - *Org$((i+1))")
   done
   ORGSLIST2=$(echo "$ORGSLIST2" | sed 's/\\n //')
 
-  ORG1AddrPort=(${PeerAddress[0]//:/ })
+  ORG1AddrPort=(${PEER_ADDRS[0]//:/ })
   ORDERERADDR="${ORG1AddrPort[0]}:$((${ORG1AddrPort[1]}-1))"
   
   sed -e "s/ORDERERADDR/${ORDERERADDR}/g" \
@@ -281,8 +267,8 @@ EOF
 
 function generateCryptoConfig() {
     PEERS_DETAIL=""
-    for i in "${!PeerAddress[@]}"; do
-        addrIN=(${PeerAddress[i]//:/ })
+    for i in "${!PEER_ADDRS[@]}"; do
+        addrIN=(${PEER_ADDRS[i]//:/ })
         PEERS_DETAIL=$(echo -e "$PEERS_DETAIL\n$(parseCryptoPeerDetail $((i+1)) ${addrIN[0]})")
     done
     PEERS_DETAIL=$(echo "$PEERS_DETAIL" | awk '{printf "%s\\n", $0}' | sed 's/\\n//')
@@ -290,7 +276,7 @@ function generateCryptoConfig() {
     PEERS_DETAIL=$(echo "${PEERS_DETAIL//\&/\\\&}")
     PEERS_DETAIL=$(echo "$PEERS_DETAIL" | sed 's/\//\\\//g')
 
-    ordererIN=(${PeerAddress[0]//:/ })
+    ordererIN=(${PEER_ADDRS[0]//:/ })
     sed -e "s/ORDERERADDR/${ordererIN[0]}/g" \
         -e "s/PEERSDETAIL/$PEERS_DETAIL/g" \
         ./organizations/crypto-config-template.yaml > network-cache/crypto-config.yaml
@@ -339,7 +325,6 @@ function main() {
   generatePeerDockerCompose
   generateOrdererDockerCompose
   prepareCoreConfig
-  releaseCerts
 }
 
 main

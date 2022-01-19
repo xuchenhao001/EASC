@@ -253,7 +253,7 @@ function join_by { local d=$1; shift; local f=$1; shift; printf %s "$f" "${@/#/$
 
 function main() {
   ORGMEMBERARR=""
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     ORGMEMBERARR="${ORGMEMBERARR} Org$((i+1))MSP.member"
   done
   SIGNATURE_POLICY=$(join_by "','" ${ORGMEMBERARR})
@@ -265,7 +265,7 @@ function main() {
 
   ## Install chaincode on peer0.org1 and peer0.org2
   echo "Installing chaincode on peers..."
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     installChaincode $((i+1))
   done
 
@@ -273,20 +273,20 @@ function main() {
   queryInstalled 1
 
   ## approve the definition for org
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     approveForMyOrg $((i+1))
     checkCommitReadiness $((i+1)) "\"Org$((i+1))MSP\": true"
   done
 
   ## now that we know for sure both orgs have approved, commit the definition
   COMMIT_IDS=""
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     COMMIT_IDS="${COMMIT_IDS} $((i+1))"
   done
   commitChaincodeDefinition ${COMMIT_IDS}
 
   ## query on both orgs to see that the definition committed successfully
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     queryCommitted $((i+1))
   done
 

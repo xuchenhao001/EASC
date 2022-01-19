@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# set -x 
 # prepending $PWD/../bin to PATH to ensure we are picking up the correct binaries
 # this may be commented out to resolve installed version of tools if desired
 export PATH=${PWD}/../../bin:$PATH
@@ -16,11 +17,7 @@ function printHelp() {
   echo "  network.sh <Mode> [Flags]"
   echo "    <Mode>"
   echo "      - 'up' - bring up fabric orderer and peer nodes. No channel is created"
-  echo "      - 'up createChannel' - bring up fabric network with one channel"
-  echo "      - 'createChannel' - create and join a channel after the network is created"
-  echo "      - 'deployCC' - deploy the fabcar chaincode on the channel"
   echo "      - 'down' - clear the network with docker-compose down"
-  echo "      - 'restart' - restart the network"
   echo
   echo "    Flags:"
   echo "    -ca <use CAs> -  create Certificate Authorities to generate the crypto material"
@@ -34,20 +31,6 @@ function printHelp() {
   echo "    -cai <ca_imagetag> - the image tag to be used for CA (defaults to \"${CA_IMAGETAG}\")"
   echo "    -verbose - verbose mode"
   echo "  network.sh -h (print this message)"
-  echo
-  echo " Possible Mode and flags"
-  echo "  network.sh up -ca -c -r -d -s -i -verbose"
-  echo "  network.sh up createChannel -ca -c -r -d -s -i -verbose"
-  echo "  network.sh createChannel -c -r -d -verbose"
-  echo "  network.sh deployCC -l -v -r -d -verbose"
-  echo
-  echo " Taking all defaults:"
-  echo "  network.sh up"
-  echo
-  echo " Examples:"
-  echo "  network.sh up createChannel -ca -c mychannel -s couchdb -i 2.0.0"
-  echo "  network.sh createChannel -c channelName"
-  echo "  network.sh deployCC -l javascript"
 }
 
 # Obtain CONTAINER_IDS and remove them
@@ -138,38 +121,21 @@ function networkUp() {
     ./prepareCerts.sh
   fi
 
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
-    # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
-    if [[ $status != "ok" ]]; then
-        echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
-        exit 1
-    fi
-
+  for i in "${!PEER_ADDRS[@]}"; do
     # start remote peer with docker-compose
     COMPOSE_FILES="-f network-cache/docker-compose-org$((i+1)).yaml"
-
-    # if [ "${DATABASE}" == "couchdb" ]; then
-    #   COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILE_COUCH}"
-    # fi
 
     # start up orderer if it is the first node
     if [[ $i -eq 0 ]]; then
       COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
     fi
 
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && ${COMPOSE_CMD} ${COMPOSE_FILES} up -d 2>&1"
+    export ${COMPOSE_CMD_ENV}; docker-compose ${COMPOSE_FILES} up -d 2>&1
   done
-
 }
 
 function cleanLogs() {
-  rm -f ~/EASC/federated-learning/result-record_*.txt
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
-    ssh ${HostUser}@${addrIN[0]} "rm -f ~/EASC/federated-learning/result-record_*.txt"
-  done
+  rm -f ../federated-learning/result-record_*.txt
 }
 
 ## call the script to join create the channel and join the peers of org1 and org2
@@ -209,27 +175,17 @@ function deployCC() {
 
 # Tear down running network
 function networkDown() {
-  for i in "${!PeerAddress[@]}"; do
-    addrIN=(${PeerAddress[i]//:/ })
-    # check ssh connection first
-    status=$(ssh -o BatchMode=yes -o ConnectTimeout=5 ${HostUser}@${addrIN[0]} echo ok 2>&1)
-    if [[ $status != "ok" ]]; then
-        echo "Please add your public key to other hosts with user \"${HostUser}\" before release certs through command \"ssh-copy-id\"!"
-        exit 1
-    fi
-
-    COMPOSE_FILES=""
-    COMPOSE_FILES_LIST=($(ssh ${HostUser}@${addrIN[0]} "ls -d ~/EASC/fabric-samples/network-cache/docker-compose*"))
-    for j in "${!COMPOSE_FILES_LIST[@]}"; do
-      COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILES_LIST[j]}"
-    done
-
-    if [[ $i -eq 0 ]]; then
-      COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
-    fi
-
-    ssh ${HostUser}@${addrIN[0]} "cd ~/EASC/fabric-samples/ && (${COMPOSE_CMD} ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh"
+  COMPOSE_FILES=""
+  COMPOSE_FILES_LIST=($(ls -d ./network-cache/docker-compose*))
+  for j in "${!COMPOSE_FILES_LIST[@]}"; do
+    COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILES_LIST[j]}"
   done
+
+  if [[ $i -eq 0 ]]; then
+    COMPOSE_FILES="${COMPOSE_FILES} -f network-cache/orderer.yaml"
+  fi
+
+  (docker-compose ${COMPOSE_FILES} down --volumes --remove-orphans || true) && ./clearLocal.sh
 }
 
 # Obtain the OS and Architecture string that will be used to select the correct
@@ -249,7 +205,7 @@ CHANNEL_NAME="mychannel"
 # certificate authorities compose file
 COMPOSE_FILE_CA=docker/docker-compose-ca.yaml
 # docker-compose command with environment variables
-COMPOSE_CMD="IMAGE_TAG=$IMAGE_TAG COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME SYS_CHANNEL=$SYS_CHANNEL docker-compose"
+COMPOSE_CMD_ENV="IMAGE_TAG=$IMAGE_TAG COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME SYS_CHANNEL=$SYS_CHANNEL"
 #
 # use golang as the default language for chaincode
 CC_SRC_LANGUAGE=golang
@@ -373,15 +329,10 @@ fi
 
 if [ "${MODE}" == "up" ]; then
   networkUp
-elif [ "${MODE}" == "createChannel" ]; then
   createChannel
-elif [ "${MODE}" == "deployCC" ]; then
   deployCC
 elif [ "${MODE}" == "down" ]; then
   networkDown
-elif [ "${MODE}" == "restart" ]; then
-  networkDown
-  networkUp
 else
   printHelp
   exit 1

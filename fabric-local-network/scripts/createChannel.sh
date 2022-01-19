@@ -125,7 +125,7 @@ function main() {
 
   ## Create anchorpeertx
   echo "### Generating anchor peer update transactions ###"
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     createAncorPeerTx Org$((i+1))MSP
   done
 
@@ -135,13 +135,13 @@ function main() {
 
   ## Join all the peers to the channel
   echo "Join Org peers to the channel..."
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     joinChannel $((i+1))
   done
 
   ## Set the anchor peers for each org in the channel
   echo "Updating anchor peers for orgs..."
-  for i in "${!PeerAddress[@]}"; do
+  for i in "${!PEER_ADDRS[@]}"; do
     updateAnchorPeers $((i+1))
   done
 

@@ -25,7 +25,7 @@ setGlobals() {
   export CORE_PEER_LOCALMSPID="Org${USING_ORG}MSP"
   export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/network-cache/peerOrganizations/org${USING_ORG}.example.com/peers/peer0.org${USING_ORG}.example.com/tls/ca.crt
   export CORE_PEER_MSPCONFIGPATH=${PWD}/network-cache/peerOrganizations/org${USING_ORG}.example.com/users/Admin@org${USING_ORG}.example.com/msp
-  export CORE_PEER_ADDRESS=${PeerAddress[$USING_ORG-1]}
+  export CORE_PEER_ADDRESS=${PEER_ADDRS[$USING_ORG-1]}
 
   if [ "$VERBOSE" == "true" ]; then
     env | grep CORE
