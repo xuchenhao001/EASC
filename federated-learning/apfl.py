@@ -19,10 +19,10 @@ import torch
 from tornado import httpclient, ioloop, web, httpserver, gen
 
 from utils.options import args_parser
-from models.Update import LocalUpdate
+from models.Train import LocalUpdate
 from models.Nets import MLP, CNNMnist, CNNCifar
 from models.Fed import FedAvg
-from models.test import test_img_total
+from models.Test import test_img_total
 from utils.util import dataset_loader, model_loader, ColoredLogger
 
 logging.setLoggerClass(ColoredLogger)

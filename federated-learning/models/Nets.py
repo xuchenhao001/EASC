@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 
 class MLP(nn.Module):
-    def __init__(self, dim_in, dim_hidden, dim_out):
+    def __init__(self, dim_in, dim_hidden=64, dim_out=10):
         super(MLP, self).__init__()
         self.layer_input = nn.Linear(dim_in, dim_hidden)
         self.relu = nn.ReLU()
@@ -25,7 +25,7 @@ class MLP(nn.Module):
 
 
 class CNNMnist(nn.Module):
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_channels=1, num_classes=10):
         super(CNNMnist, self).__init__()
         self.conv1 = nn.Conv2d(num_channels, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
@@ -64,9 +64,9 @@ class CNNCifar(nn.Module):
 
 
 class UCI_CNN(nn.Module):
-    def __init__(self, n_class=6):
+    def __init__(self, num_classes=6):
         super(UCI_CNN, self).__init__()
-        self.n_class = n_class
+        self.n_class = num_classes
         self.conv_layer = nn.Sequential(
             nn.Conv1d(6, 196, 15, stride=1, padding=15 // 2),
             nn.ReLU(),
@@ -86,52 +86,4 @@ class UCI_CNN(nn.Module):
         x = self.conv_layer(x)
         x = x.reshape(x.size(0), -1)
         out = self.fc(x)
-        return out
-
-
-class MN_Block(nn.Module):
-    '''Depthwise conv + Pointwise conv'''
-    def __init__(self, in_planes, out_planes, stride=1):
-        super(MN_Block, self).__init__()
-        self.conv1 = nn.Conv2d\
-            (in_planes, in_planes, kernel_size=3, stride=stride, padding=1, groups=in_planes, bias=False)
-        self.bn1 = nn.BatchNorm2d(in_planes)
-        self.conv2 = nn.Conv2d\
-            (in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_planes)
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        return out
-
-
-class MobileNet(nn.Module):
-    # (128,2) means conv planes=128, conv stride=2,
-    # by default conv stride=1
-    cfg = [64, (128,2), 128, (256,2), 256, (512,2),
-           512, 512, 512, 512, 512, (1024,2), 1024]
-
-    def __init__(self, num_classes=5):
-        super(MobileNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.layers = self._make_layers(in_planes=32)
-        self.linear = nn.Linear(4096, num_classes)
-
-    def _make_layers(self, in_planes):
-        layers = []
-        for x in self.cfg:
-            out_planes = x if isinstance(x, int) else x[0]
-            stride = 1 if isinstance(x, int) else x[1]
-            layers.append(MN_Block(in_planes, out_planes, stride))
-            in_planes = out_planes
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layers(out)
-        out = F.avg_pool2d(out, 2)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
         return out

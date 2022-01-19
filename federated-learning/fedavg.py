@@ -19,13 +19,13 @@ import torch
 from tornado import httpclient, ioloop, web, httpserver, gen
 
 from utils.options import args_parser
-from models.Update import LocalUpdate
+from models.Train import LocalUpdate
 from models.Fed import FedAvg
-from models.test import test_img_total
+from models.Test import test_img_total
 from utils.util import dataset_loader, model_loader, ColoredLogger
 
 logging.setLoggerClass(ColoredLogger)
-logger = logging.getLogger("main_fed")
+logger = logging.getLogger("fedavg")
 
 # TO BE CHANGED
 # wait in seconds for other nodes to start

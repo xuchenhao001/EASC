@@ -20,13 +20,13 @@ import torch
 from tornado import httpclient, ioloop, web, gen, httpserver
 
 from utils.options import args_parser
-from models.Update import LocalUpdate
+from models.Train import LocalUpdate
 from models.Fed import FedAvg
-from models.test import test_img, test_img_total
+from models.Test import test_img, test_img_total
 from utils.util import dataset_loader, model_loader, ColoredLogger
 
 logging.setLoggerClass(ColoredLogger)
-logger = logging.getLogger("fed_server_alpha")
+logger = logging.getLogger("scei_alpha")
 
 # TO BE CHANGED
 # To change the static alpha, use utils/options: "hyperpara"
