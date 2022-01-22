@@ -5,6 +5,7 @@
 import datetime
 import math
 import os
+import time
 
 from numpy import random as nprandom
 
@@ -43,15 +44,10 @@ def consensus_time(participants, block_size, network_speed, network_avg_delay, n
     sum_time_ms = consensus_sum_time.seconds * 1000 + consensus_sum_time.microseconds / 1000
     if os.path.exists("new_block"):
         os.remove("new_block")
-    print("Time (ms):\t" + str(sum_time_ms))
+    return sum_time_ms
 
 
-def main():
-    ##############################
-    # Global Parameters Set Start
-    ##############################
-    participants = 200
-
+def post_to_blockchain(node_num):
     # block size in KB
     block_size = 5
     # network speed in KB/s
@@ -60,16 +56,7 @@ def main():
     network_avg_delay = 50
     network_delay_std = 1
     propagation_rate = 2
+    time_ms = consensus_time(node_num, block_size, network_speed, network_avg_delay, network_delay_std,
+                             propagation_rate)
+    time.sleep(time_ms/1000)
 
-    ##############################
-    # Global Parameters Set End
-    ##############################
-
-    # start experiment with iterated parameters
-    for participants in [100, 150, 200, 400, 800]:
-    # for rounds in range(10):
-        consensus_time(participants, block_size, network_speed, network_avg_delay, network_delay_std, propagation_rate)
-
-
-if __name__ == "__main__":
-    main()

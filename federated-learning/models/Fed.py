@@ -4,10 +4,9 @@
 
 import copy
 import torch
-from torch import nn
 
 
-def FedAvg(w):
+def fed_avg(w):
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
         for i in range(1, len(w)):

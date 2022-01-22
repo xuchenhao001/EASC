@@ -18,6 +18,10 @@ class ModelStore:
         self.global_model_compressed = None
         self.global_model_hash = None
         self.global_model_version = -1
+        # for customized local model
+        self.my_local_model = None
+        self.acc_alpha_count_num = 0
+        self.acc_alpha_maps = {}
 
     def local_models_add_count(self, local_uuid, w_local, count_target):
         reach_target = False
@@ -37,6 +41,24 @@ class ModelStore:
         self.local_models_count_num = 0
         lock.release()
         logger.debug("Reset local_models, now: {}".format(len(self.local_models)))
+
+    def acc_alpha_add_count(self, local_uuid, acc_alpha_map, count_target):
+        reach_target = False
+        lock.acquire()
+        self.acc_alpha_maps[local_uuid] = acc_alpha_map
+        self.acc_alpha_count_num += 1
+        if self.acc_alpha_count_num == count_target:
+            reach_target = True
+        lock.release()
+        logger.debug("Received acc_alpha_map: {} in total".format(self.acc_alpha_count_num))
+        return reach_target
+
+    def acc_alpha_reset(self):
+        lock.acquire()
+        self.acc_alpha_maps = {}
+        self.acc_alpha_count_num = 0
+        lock.release()
+        logger.debug("Reset acc_alpha_maps, now: {}".format(len(self.local_models)))
 
     def update_global_model(self, w_glob, epochs=None):
         self.global_model = w_glob

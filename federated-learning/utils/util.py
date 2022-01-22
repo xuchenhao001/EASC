@@ -20,6 +20,7 @@ import torch
 from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP
 from models.Test import test_img_total
 from models.Train import train_cnn_mlp
+from utils.blockchain import post_to_blockchain
 
 lock = threading.Lock()
 # format colorful log output
@@ -155,6 +156,16 @@ def http_client_post(url, body_data, accumulate_time=True):
     if accumulate_time:
         add_communication_time(request_time)
     return response.json()
+
+
+def simu_http_post(url, body_data, node_num, accumulate_time=True):
+    logger.debug("[SIMU HTTP Start] [" + body_data['message'] + "] Start http client post to: " + url)
+    request_start_time = time.time()
+    post_to_blockchain(node_num)
+    logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
+    request_time = time.time() - request_start_time
+    if accumulate_time:
+        add_communication_time(request_time)
 
 
 accumulate_communication_time = 0

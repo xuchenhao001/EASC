@@ -6,7 +6,7 @@ import torch
 
 from utils.options import args_parser
 from utils.util import model_loader, ColoredLogger, http_client_post, test_model, train_model, record_log, \
-    reset_communication_time, env_from_sourcing
+    reset_communication_time, env_from_sourcing, simu_http_post, get_ip
 from utils.Datasets import MyDataset
 
 logging.setLoggerClass(ColoredLogger)
@@ -24,15 +24,17 @@ class Trainer:
         self.init_time = time.time()
         self.round_start_time = time.time()
         self.round_train_duration = 0
+        self.round_test_duration = 0
         self.epoch = 1
         self.uuid = -1
+        self.from_ip = ""
+        # for committee election
+        self.committee_elect_duration = 0
 
     def parse_args(self):
         self.args = args_parser()
         self.args.device = torch.device(
             'cuda:{}'.format(self.args.gpu) if torch.cuda.is_available() and self.args.gpu != -1 else 'cpu')
-        # read num_users from blockchain
-        self.args.num_users = len(self.peer_address_list)
         arguments = vars(self.args)
         logger.info("==========================================")
         for k, v in arguments.items():
@@ -48,9 +50,10 @@ class Trainer:
         peer_header_addr = self.peer_address_list[0].split(":")[0]
         # initially the trigger url is load on the first peer
         self.trigger_url = "http://" + peer_header_addr + ":" + str(fed_listen_port) + "/trigger"
+        self.from_ip = get_ip(self.args.test_ip_addr)
 
     def init_dataset(self):
-        self.dataset = MyDataset(self.args.dataset, self.args.dataset_train_size, self.args.iid, self.args.num_users)
+        self.dataset = MyDataset(self.args.dataset, self.args.dataset_train_size, self.args.num_users)
         if self.dataset.dataset_train is None:
             logger.error('Error: unrecognized dataset')
             return False
@@ -107,6 +110,9 @@ class Trainer:
         response = http_client_post(self.trigger_url, body_data)
         if "detail" in response:
             return response.get("detail")
+
+    def post_msg_blockchain(self, body_data, num_users):
+        simu_http_post(self.trigger_url, body_data, num_users)
 
     def is_first_epoch(self):
         return self.epoch == 1
