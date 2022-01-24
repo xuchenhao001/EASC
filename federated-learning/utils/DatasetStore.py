@@ -11,7 +11,7 @@ from utils.util import ColoredLogger
 
 logging.setLoggerClass(ColoredLogger)
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
-logger = logging.getLogger("Datasets")
+logger = logging.getLogger("DatasetStore")
 
 
 class DatasetSplit(Dataset):
@@ -31,11 +31,18 @@ class DatasetSplit(Dataset):
         return data, label
 
 
-class MyDataset:
-    def __init__(self, dataset_name, dataset_train_size, num_users):
-        self.dataset_train_size = dataset_train_size
-        dataset_test_size = int(dataset_train_size * 0.2)
-        self.dataset_test_size = dataset_test_size
+class LocalDataset:
+    def __init__(self):
+        self.initialized = False
+        self.dataset_name = ""
+        self.dataset_train = None
+        self.dataset_test = None
+        self.image_shape = None
+        self.dict_users = None
+        self.test_users = None
+        self.skew_users = None
+
+    def init_local_dataset(self, dataset_name, num_users):
         dataset_train = None
         dataset_test = None
         real_path = os.path.dirname(os.path.realpath(__file__))
@@ -77,9 +84,11 @@ class MyDataset:
         self.dataset_name = dataset_name
         self.dataset_train = dataset_train
         self.dataset_test = dataset_test
+        self.image_shape = dataset_train[0][0].shape
         self.dict_users = dict_users
         self.test_users = test_users
         self.skew_users = skew_users
+        self.initialized = True
 
     def load_train_dataset(self, idx, local_bs):
         split_ds = DatasetSplit(self.dataset_train, self.dict_users[idx])

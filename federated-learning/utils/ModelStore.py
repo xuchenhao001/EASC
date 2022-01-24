@@ -10,18 +10,25 @@ logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("ModelStore")
 
 
-class ModelStore:
+class CentralModelStore:
     def __init__(self):
-        self.local_models_count_num = 0
-        self.local_models = {}
         self.global_model = None
         self.global_model_compressed = None
         self.global_model_hash = None
         self.global_model_version = -1
-        # for customized local model
-        self.my_local_model = None
+        self.local_models_count_num = 0
+        self.local_models = {}
         self.acc_alpha_count_num = 0
         self.acc_alpha_maps = {}
+
+    def update_global_model(self, w_glob, epochs=None):
+        self.global_model = copy.deepcopy(w_glob)
+        self.global_model_compressed = compress_tensor(w_glob)
+        self.global_model_hash = generate_md5_hash(w_glob)
+        if epochs is None:
+            self.global_model_version += 1
+        else:
+            self.global_model_version = epochs
 
     def local_models_add_count(self, local_uuid, w_local, count_target):
         reach_target = False
@@ -58,21 +65,23 @@ class ModelStore:
         self.acc_alpha_maps = {}
         self.acc_alpha_count_num = 0
         lock.release()
-        logger.debug("Reset acc_alpha_maps, now: {}".format(len(self.local_models)))
-
-    def update_global_model(self, w_glob, epochs=None):
-        self.global_model = w_glob
-        self.global_model_compressed = compress_tensor(w_glob)
-        self.global_model_hash = generate_md5_hash(w_glob)
-        if epochs is None:
-            self.global_model_version += 1
-        else:
-            self.global_model_version = epochs
+        logger.debug("Reset acc_alpha_maps, now: {}".format(len(self.acc_alpha_maps)))
 
 
-class APFLModelStore(ModelStore):
+class PersonalModelStore:
     def __init__(self):
-        ModelStore.__init__(self)
+        self.my_local_model = None
+        self.my_global_model = None
+        self.my_global_model_hash = None
+
+    def update_my_global_model(self, w_glob):
+        self.my_global_model = copy.deepcopy(w_glob)
+        self.my_global_model_hash = generate_md5_hash(w_glob)
+
+
+class APFLModelStore(PersonalModelStore):
+    def __init__(self):
+        PersonalModelStore.__init__(self)
         # for apfl
         self.difference1 = None
         self.difference2 = None

@@ -38,7 +38,6 @@ def init():
     load_result = trainer.init_dataset()
     if not load_result:
         sys.exit()
-    trainer.dataset.init_trojan_attack(trainer.args)
 
     load_result = trainer.init_model()
     if not load_result:
@@ -154,7 +153,7 @@ def gather_local_w(local_uuid, from_ip, w_compressed):
     if model_store.local_models_add_count(local_uuid, utils.util.decompress_tensor(w_compressed),
                                           trainer.args.num_users):
         logger.debug("Gathered enough w, average and release them")
-        w_glob = fed_avg(model_store.local_models)
+        w_glob = fed_avg(model_store.local_models, model_store.global_model)
         # reset local models after aggregation
         model_store.local_models_reset()
         # save global model

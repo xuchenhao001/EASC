@@ -103,7 +103,7 @@ def model_loader(model_name, dataset_name, device, img_size):
     return net_glob
 
 
-def test_model(net_glob, my_dataset, idx, is_iid, local_test_bs, device, get_acc=True):
+def test_model(net_glob, my_dataset, idx, local_test_bs, device, get_acc=True, is_iid=False):
     if is_iid:
         idx_total = [my_dataset.test_users[idx]]
         acc_list, loss_list = test_img_total(net_glob, my_dataset, idx_total, local_test_bs, device)
@@ -133,18 +133,9 @@ def test_model(net_glob, my_dataset, idx, is_iid, local_test_bs, device, get_acc
             return loss_local, loss_local_skew1, loss_local_skew2, loss_local_skew3, loss_local_skew4
 
 
-def train_model(net_glob, my_dataset, idx, local_ep, device, lr, momentum, local_bs, is_first_epoch):
+def train_model(net_glob, my_dataset, idx, local_ep, device, lr, momentum, local_bs):
     net_glob_cp = copy.deepcopy(net_glob).to(device)
-    return train_cnn_mlp(net_glob_cp, my_dataset, idx, local_ep, device, lr, momentum, local_bs, is_first_epoch)
-
-
-# returns variable from sourcing a file
-def env_from_sourcing(file_to_source_path, variable_name):
-    source = 'source %s && export MYVAR=$(echo "${%s[@]}")' % (file_to_source_path, variable_name)
-    dump = '/usr/bin/python3 -c "import os, json; print(os.getenv(\'MYVAR\'))"'
-    pipe = subprocess.Popen(['/bin/bash', '-c', '%s && %s' % (source, dump)], stdout=subprocess.PIPE)
-    # return json.loads(pipe.stdout.read())
-    return pipe.stdout.read().decode("utf-8").rstrip()
+    return train_cnn_mlp(net_glob_cp, my_dataset, idx, local_ep, device, lr, momentum, local_bs)
 
 
 def http_client_post(url, body_data, accumulate_time=True):
@@ -162,7 +153,7 @@ def simu_http_post(url, body_data, node_num, accumulate_time=True):
     logger.debug("[SIMU HTTP Start] [" + body_data['message'] + "] Start http client post to: " + url)
     request_start_time = time.time()
     post_to_blockchain(node_num)
-    logger.debug("[HTTP Success] [" + body_data['message'] + "] from " + url)
+    logger.debug("[SIMU HTTP Success] [" + body_data['message'] + "] from " + url)
     request_time = time.time() - request_start_time
     if accumulate_time:
         add_communication_time(request_time)
@@ -185,6 +176,12 @@ def reset_communication_time():
     accumulate_communication_time = 0
     lock.release()
     return communication_time
+
+
+def post_msg_trigger(trigger_url, body_data):
+    response = http_client_post(trigger_url, body_data)
+    if "detail" in response:
+        return response.get("detail")
 
 
 def __conver_numpy_value_to_tensor(numpy_data):

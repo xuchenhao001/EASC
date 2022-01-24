@@ -2,10 +2,10 @@ import torch
 from torch import nn
 
 
-def train_cnn_mlp(net, my_dataset, idx, local_ep, device, lr, momentum, local_bs, is_first_epoch):
+def train_cnn_mlp(net, my_dataset, idx, local_ep, device, lr, momentum, local_bs):
     net.train()
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=momentum)
-    ldr_train = my_dataset.load_train_dataset(idx, local_bs, is_first_epoch)
+    ldr_train = my_dataset.load_train_dataset(idx, local_bs)
     loss_func = nn.CrossEntropyLoss()
 
     epoch_loss = []

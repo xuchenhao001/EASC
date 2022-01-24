@@ -33,7 +33,6 @@ def init():
     load_result = trainer.init_dataset()
     if not load_result:
         sys.exit()
-    trainer.dataset.init_trojan_attack(trainer.args)
 
     load_result = trainer.init_model()
     if not load_result:

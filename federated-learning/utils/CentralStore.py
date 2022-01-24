@@ -60,6 +60,7 @@ class IPCount:
         lock.acquire()
         self.uuid += 1
         new_id = self.uuid
+        logger.debug("new id: {}".format(new_id))
         lock.release()
         return new_id
 
