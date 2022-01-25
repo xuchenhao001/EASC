@@ -1,7 +1,7 @@
 import logging
 import time
 
-from utils.ModelStore import PersonalModelStore
+from utils.ModelStore import PersonalModelStore, APFLPersonalModelStore
 from utils.util import model_loader, ColoredLogger, test_model, train_model, record_log, reset_communication_time, \
     simu_http_post
 
@@ -83,3 +83,4 @@ class APFLTrainer(Trainer):
     def __init__(self):
         super().__init__()
         self.hyper_para = 0
+        self.model_store = APFLPersonalModelStore()

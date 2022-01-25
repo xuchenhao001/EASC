@@ -38,6 +38,7 @@ def args_parser():
 
     # for APFL
     parser.add_argument('--apfl_hyper', type=float, default=0.3, help='APFL hypermeter alpha')
+    parser.add_argument('--apfl_agg_freq', type=int, default=10, help='APFL aggregation round frequency')
 
     # for SCEI
     parser.add_argument('--hyperpara', type=float, default=0.75, help="hyperpara alpha")

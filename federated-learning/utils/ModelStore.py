@@ -21,12 +21,12 @@ class CentralModelStore:
         self.acc_alpha_count_num = 0
         self.acc_alpha_maps = {}
 
-    def update_global_model(self, w_glob, epochs=None):
+    def update_global_model(self, w_glob, step=1, epochs=None):
         self.global_model = copy.deepcopy(w_glob)
         self.global_model_compressed = compress_tensor(w_glob)
         self.global_model_hash = generate_md5_hash(w_glob)
         if epochs is None:
-            self.global_model_version += 1
+            self.global_model_version += step
         else:
             self.global_model_version = epochs
 
@@ -79,7 +79,7 @@ class PersonalModelStore:
         self.my_global_model_hash = generate_md5_hash(w_glob)
 
 
-class APFLModelStore(PersonalModelStore):
+class APFLPersonalModelStore(PersonalModelStore):
     def __init__(self):
         PersonalModelStore.__init__(self)
         # for apfl

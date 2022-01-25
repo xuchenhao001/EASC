@@ -41,8 +41,7 @@ def init_trainer():
     trainer.net_glob.train()
     # generate md5 hash from model, which is treated as global model of previous round.
     w = trainer.net_glob.state_dict()
-    # TODO: clearly use central_model_store and trainer.model_store
-    central_model_store.update_global_model(w, -1)  # -1 means the initial global model
+    central_model_store.update_global_model(w, epochs=-1)  # -1 means the initial global model
     trainer.model_store.update_my_global_model(w)
     trainer_pool[trainer.uuid] = trainer
     return trainer.uuid
