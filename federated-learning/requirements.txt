@@ -6,3 +6,4 @@ pandas~=1.0.3
 matplotlib~=3.2.1
 requests~=2.23.0
 Flask~=2.0.2
+hickle~=4.0.4

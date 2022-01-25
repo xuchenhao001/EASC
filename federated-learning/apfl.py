@@ -149,7 +149,7 @@ def gather_local_w(local_uuid, from_ip, w_compressed):
     if central_model_store.local_models_add_count(local_uuid, utils.util.decompress_tensor(w_compressed),
                                                   env_store.args.num_users):
         logger.debug("Gathered enough w, average and release them")
-        w_glob = fed_avg(central_model_store.local_models, central_model_store.global_model)
+        w_glob = fed_avg(central_model_store.local_models, central_model_store.global_model, env_store.args.device)
         # reset local models after aggregation
         central_model_store.local_models_reset()
         # save global model

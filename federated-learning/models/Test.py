@@ -10,7 +10,7 @@ def test_img(net_g, my_dataset, test_indices, local_test_bs, device):
     data_loader = my_dataset.load_test_dataset(test_indices, local_test_bs)
     for idx, (data, target) in enumerate(data_loader):
         data = data.detach().clone().type(torch.FloatTensor)
-        if device != "cpu":
+        if device != torch.device('cpu'):
             data, target = data.to(device), target.to(device)
         log_probs = net_g(data)
         # sum up batch loss
