@@ -12,3 +12,4 @@ output/
 raft/hraftd
 networkCache.tar.gz
 figures/
+new_block

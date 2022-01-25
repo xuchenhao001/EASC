@@ -4,7 +4,7 @@
 
 import datetime
 import math
-import os
+# import os
 import time
 
 from numpy import random as nprandom
@@ -42,8 +42,8 @@ def consensus_time(participants, block_size, network_speed, network_avg_delay, n
                                                       network_delay_std, propagation_rate)
     consensus_sum_time += end_time - start_time + datetime.timedelta(milliseconds=propagation_time_ms)
     sum_time_ms = consensus_sum_time.seconds * 1000 + consensus_sum_time.microseconds / 1000
-    if os.path.exists("new_block"):
-        os.remove("new_block")
+    # if os.path.exists("new_block"):
+    #     os.remove("new_block")
     return sum_time_ms
 
 
