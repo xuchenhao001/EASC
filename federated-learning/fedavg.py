@@ -6,7 +6,9 @@ from flask import Flask, request
 
 import utils.util
 from utils.CentralStore import IPCount
-from utils.ModelStore import ModelStore
+from utils.DatasetStore import LocalDataset
+from utils.EnvStore import EnvStore
+from utils.ModelStore import CentralModelStore
 from utils.Trainer import Trainer
 from utils.util import ColoredLogger
 from models.Fed import fed_avg
@@ -15,27 +17,19 @@ logging.setLoggerClass(ColoredLogger)
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 logger = logging.getLogger("fedavg")
 
-# TO BE CHANGED
-# federated learning server listen port
-fed_listen_port = 8888
-# TO BE CHANGED FINISHED
-
-# NOT TO TOUCH VARIABLES BELOW
-trainer = Trainer()
-model_store = ModelStore()
+env_store = EnvStore()
+local_dataset = LocalDataset()
+central_model_store = CentralModelStore()
 ipCount = IPCount()
+trainer_pool = {}  # multiple thread trainers stored in this map
 
 
-def init():
-    trainer.parse_args()
-    trainer.init_urls(fed_listen_port)
-    logger.setLevel(trainer.args.log_level)
+def init_trainer():
+    trainer = Trainer()
+    trainer.uuid = fetch_uuid()
 
-    load_result = trainer.init_dataset()
-    if not load_result:
-        sys.exit()
-
-    load_result = trainer.init_model()
+    load_result = trainer.init_model(env_store.args.model, env_store.args.dataset, env_store.args.device,
+                                     local_dataset.image_shape)
     if not load_result:
         sys.exit()
 
@@ -43,12 +37,14 @@ def init():
     trainer.net_glob.train()
     # generate md5 hash from model, which is treated as global model of previous round.
     w = trainer.net_glob.state_dict()
-    model_store.update_global_model(w, -1)  # -1 means the initial global model
+    central_model_store.update_global_model(w, epochs=-1)  # -1 means the initial global model
+    trainer.model_store.update_my_global_model(w)
+    trainer_pool[trainer.uuid] = trainer
+    return trainer.uuid
 
 
-def train():
-    if trainer.uuid == -1:
-        trainer.uuid = fetch_uuid()
+def train(trainer_uuid):
+    trainer = trainer_pool[trainer_uuid]
     logger.debug("Train local model for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
 
     trainer.round_start_time = time.time()
@@ -60,16 +56,16 @@ def train():
             "message": "global_model",
             "epochs": -1,
         }
-        detail = trainer.post_msg_trigger(body_data)
+        detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
         global_model_compressed = detail.get("global_model")
         w_glob = utils.util.decompress_tensor(global_model_compressed)
         trainer.load_model(w_glob)
-        trainer.evaluate_model_with_log(record_epoch=0, clean=True)
+        trainer.evaluate_model_with_log(local_dataset, env_store.args, record_epoch=0, clean=True)
     else:
-        trainer.load_model(model_store.global_model)
+        trainer.load_model(trainer.model_store.my_global_model)
 
     train_start_time = time.time()
-    w_local, w_loss = trainer.train()
+    w_local, w_loss = trainer.train(local_dataset, env_store.args)
     trainer.round_train_duration = time.time() - train_start_time
 
     # send local model to the first node
@@ -78,9 +74,9 @@ def train():
         "message": "upload_local_w",
         "w_compressed": w_local_compressed,
         "uuid": trainer.uuid,
-        "from_ip": trainer.from_ip,
+        "from_ip": env_store.from_ip,
     }
-    trainer.post_msg_trigger(body_data)
+    utils.util.post_msg_trigger(env_store.trigger_url, body_data)
     # send hash of local model to the blockchain
     body_data = {
         'message': 'LOCAL_HASH',
@@ -90,57 +86,61 @@ def train():
         'uuid': trainer.uuid,
         'epochs': trainer.epoch,
     }
-    trainer.post_msg_blockchain(body_data, trainer.args.num_users)
+    trainer.post_msg_blockchain(body_data, env_store.args.num_users)
 
 
 def gather_local_w(local_uuid, from_ip, w_compressed):
     ipCount.set_map(local_uuid, from_ip)
-    if model_store.local_models_add_count(local_uuid, utils.util.decompress_tensor(w_compressed),
-                                          trainer.args.num_users):
+    if central_model_store.local_models_add_count(local_uuid, utils.util.decompress_tensor(w_compressed),
+                                                  env_store.args.num_users):
         logger.debug("Gathered enough w, average and release them")
-        w_glob = fed_avg(model_store.local_models, model_store.global_model)
+        w_glob = fed_avg(central_model_store.local_models, central_model_store.global_model)
         # reset local models after aggregation
-        model_store.local_models_reset()
+        central_model_store.local_models_reset()
         # save global model
-        model_store.update_global_model(w_glob, trainer.epoch)
+        central_model_store.update_global_model(w_glob)
         for uuid in ipCount.get_keys():
             body_data = {
                 "message": "release_global_w",
-                "w_compressed": model_store.global_model_compressed,
+                "w_compressed": central_model_store.global_model_compressed,
+                "uuid": uuid,
             }
-            my_url = "http://" + ipCount.get_map(uuid) + ":" + str(fed_listen_port) + "/trigger"
+            my_url = "http://" + ipCount.get_map(uuid) + ":" + str(env_store.args.fl_listen_port) + "/trigger"
             utils.util.http_client_post(my_url, body_data)
 
 
-def receive_global_w(w_glob_compressed):
+def receive_global_w(trainer_uuid, w_glob_compressed):
+    trainer = trainer_pool[trainer_uuid]
     logger.debug("Received latest global model for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
 
     # load hash of new global model, which is downloaded from the leader
     w_glob = utils.util.decompress_tensor(w_glob_compressed)
+    trainer.model_store.update_my_global_model(w_glob)
 
     # finally, evaluate the global model
     trainer.load_model(w_glob)
-    trainer.evaluate_model_with_log(record_communication_time=True)
+    trainer.evaluate_model_with_log(local_dataset, env_store.args, record_communication_time=True)
 
     # epochs count down to 0
     trainer.epoch += 1
-    if trainer.epoch <= trainer.args.epochs:
-        train()
+    if trainer.epoch <= env_store.args.epochs:
+        logger.info("########## EPOCH #{} ##########".format(trainer.epoch))
+        train(trainer.uuid)
     else:
         logger.info("########## ALL DONE! ##########")
         body_data = {
             "message": "shutdown_python",
             "uuid": trainer.uuid,
-            "from_ip": trainer.from_ip,
+            "from_ip": env_store.from_ip,
         }
-        trainer.post_msg_trigger(body_data)
+        utils.util.post_msg_trigger(env_store.trigger_url, body_data)
 
 
 def fetch_uuid():
     body_data = {
         "message": "fetch_uuid",
     }
-    detail = trainer.post_msg_trigger(body_data)
+    detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
     uuid = detail.get("uuid")
     return uuid
 
@@ -152,9 +152,9 @@ def load_uuid():
 
 
 def load_global_model(epochs):
-    if epochs == model_store.global_model_version:
+    if epochs == central_model_store.global_model_version:
         detail = {
-            "global_model": model_store.global_model_compressed,
+            "global_model": central_model_store.global_model_compressed,
         }
     else:
         detail = {
@@ -164,8 +164,9 @@ def load_global_model(epochs):
 
 
 def start_train():
-    time.sleep(trainer.args.start_sleep)
-    train()
+    time.sleep(env_store.args.start_sleep)
+    trainer_uuid = init_trainer()
+    train(trainer_uuid)
 
 
 def my_route(app):
@@ -185,25 +186,33 @@ def my_route(app):
                 threading.Thread(target=gather_local_w, args=(
                     data.get("uuid"), data.get("from_ip"), data.get("w_compressed"))).start()
             elif message == "release_global_w":
-                threading.Thread(target=receive_global_w, args=(data.get("w_compressed"), )).start()
+                threading.Thread(target=receive_global_w, args=(data.get("uuid"), data.get("w_compressed"))).start()
             elif message == "shutdown_python":
                 threading.Thread(target=utils.util.shutdown_count, args=(
-                    data.get("uuid"), data.get("from_ip"), fed_listen_port, trainer.args.num_users)).start()
+                    data.get("uuid"), data.get("from_ip"), env_store.args.fl_listen_port,
+                    env_store.args.num_users)).start()
             elif message == "shutdown":
-                threading.Thread(target=utils.util.my_exit, args=(trainer.args.exit_sleep, )).start()
+                threading.Thread(target=utils.util.my_exit, args=(env_store.args.exit_sleep,)).start()
             response = {"status": status, "detail": detail}
             return response
 
 
 def main():
-    init()
+    # init environment arguments
+    env_store.init()
+    # init local dataset
+    local_dataset.init_local_dataset(env_store.args.dataset, env_store.args.num_users)
+    # set logger level
+    logger.setLevel(env_store.args.log_level)
 
-    threading.Thread(target=start_train, args=()).start()
+    for _ in range(env_store.args.num_users):
+        logger.debug("start new thread")
+        threading.Thread(target=start_train, args=()).start()
 
     flask_app = Flask(__name__)
     my_route(flask_app)
-    logger.info("start serving at " + str(fed_listen_port) + "...")
-    flask_app.run(host="0.0.0.0", port=fed_listen_port)
+    logger.info("start serving at " + str(env_store.args.fl_listen_port) + "...")
+    flask_app.run(host="0.0.0.0", port=int(env_store.args.fl_listen_port))
 
 
 if __name__ == "__main__":
