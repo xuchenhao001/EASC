@@ -48,12 +48,18 @@ def mnist_noniid(dataset, num_users):
     return dict_users
 
 
-
 def get_indices(labels, user_labels, n_samples):
+    # print("labels: {}".format(labels))
+    # print("user_labels: {}".format(user_labels))
+    # print("n_samples: {}".format(n_samples))
     indices = []
     for selected_label in user_labels:
-        label_samples = np.where(labels[1,:] == selected_label)
+        # print("selected_label: {}".format(selected_label))
+        label_samples = np.where(labels[1, :] == selected_label)
+        # print("label_samples: {}".format(label_samples))
         label_indices = labels[0, label_samples]
+        # print("label_indices: {}".format(label_indices))
+        # print("random choice: {}, {}".format(label_indices[0], n_samples))
         selected_indices = list(np.random.choice(label_indices[0], n_samples, replace=False))
         indices += selected_indices
     return indices
@@ -82,18 +88,21 @@ def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist',
     if dataset_name == 'mnist':
         labels = list(range(10))
         samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
-    elif dataset_name == 'cifar':
+    elif dataset_name == 'cifar10':
         labels = list(range(10))
         samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
+    elif dataset_name == 'cifar100':
+        labels = list(range(100))
+        samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
+    elif dataset_name == 'imagenet':
+        labels = list(range(200))
+        samples = [150, 50, int(50 * skew1_pct), int(50 * skew2_pct), int(50 * skew3_pct), int(50 * skew4_pct)]
     elif dataset_name == 'uci':
         labels = list(range(6))
         samples = [500, 200, int(200*skew1_pct), int(200*skew2_pct), int(200*skew3_pct), int(200*skew4_pct)]
     elif dataset_name == 'realworld':
         labels = list(range(8))
         samples = [500, 100, int(100*skew1_pct), int(100*skew2_pct), int(100*skew3_pct), int(100*skew4_pct)]
-    elif dataset_name == 'flowers':
-        labels = list(range(5))
-        samples = [150, 50, int(50*skew1_pct), int(50*skew2_pct), int(50*skew3_pct), int(50*skew4_pct)]
     for i in range(num_users):
         user_labels = np.random.choice(labels, size=kept_class, replace=False)
         skew_labels = [i for i in labels if i not in user_labels]

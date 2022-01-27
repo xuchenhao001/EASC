@@ -20,9 +20,10 @@ def args_parser():
     # Model and Datasets
     # model arguments, support model: "cnn", "mlp"
     parser.add_argument('--model', type=str, default='cnn', help='model name')
-    # support dataset: "mnist", "fmnist", "cifar", "uci", "realworld"
-    parser.add_argument('--dataset', type=str, default='cifar', help="name of dataset")
-    # total dataset training size: MNIST: 60000, FASHION-MNIST:60000, CIFAR-10: 60000, UCI: 10929, REALWORLD: 285148,
+    # support dataset: "mnist", "fmnist", "cifar10", "cifar100", "imagenet", "uci", "realworld"
+    parser.add_argument('--dataset', type=str, default='imagenet', help="name of dataset")
+    # total dataset training size: MNIST: 60000, FASHION-MNIST:60000, CIFAR-10: 60000, CIFAR-100: 60000,
+    # ImageNet: 100000, UCI: 10929, REALWORLD: 285148,
     parser.add_argument('--dataset_train_size', type=int, default=500, help="total dataset training size")
 
     # env settings

@@ -87,10 +87,14 @@ logger = logging.getLogger("util")
 def model_loader(model_name, dataset_name, device, img_size):
     net_glob = None
     # build model, init part
-    if model_name == 'cnn' and dataset_name == 'cifar':
-        net_glob = CNNCifar(num_classes=10).to(device)
-    elif model_name == 'cnn' and dataset_name == 'mnist':
+    if model_name == 'cnn' and dataset_name == 'mnist':
         net_glob = CNNMnist(num_classes=10).to(device)
+    elif model_name == 'cnn' and dataset_name == 'cifar10':
+        net_glob = CNNCifar(num_classes=10).to(device)
+    elif model_name == 'cnn' and dataset_name == 'cifar100':
+        net_glob = CNNCifar(num_classes=100).to(device)
+    elif model_name == 'cnn' and dataset_name == 'imagenet':
+        net_glob = CNNCifar(num_classes=1000).to(device)
     elif model_name == 'cnn' and dataset_name == 'uci':
         net_glob = UCI_CNN(num_classes=6).to(device)
     elif model_name == 'cnn' and dataset_name == 'realworld':
@@ -306,5 +310,5 @@ def record_log(user_id, epoch, time_list, acc_list, clean=False):
 def my_exit(exit_sleep):
     time.sleep(exit_sleep)  # sleep for a while before exit
     logger.info("########## PYTHON SHUTTING DOWN! ##########")
-    os._exit(0)
+    exit(0)
 
