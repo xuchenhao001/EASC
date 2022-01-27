@@ -7,9 +7,7 @@ import gzip
 import hashlib
 import json
 import logging
-import os
 import socket
-import subprocess
 import threading
 import time
 
@@ -17,7 +15,7 @@ import numpy as np
 import requests
 import torch
 
-from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP
+from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP, CNNImageNet
 from models.Test import test_img_total
 from models.Train import train_cnn_mlp
 from utils.blockchain import post_to_blockchain
@@ -94,7 +92,7 @@ def model_loader(model_name, dataset_name, device, img_size):
     elif model_name == 'cnn' and dataset_name == 'cifar100':
         net_glob = CNNCifar(num_classes=100).to(device)
     elif model_name == 'cnn' and dataset_name == 'imagenet':
-        net_glob = CNNCifar(num_classes=1000).to(device)
+        net_glob = CNNImageNet(num_classes=200).to(device)
     elif model_name == 'cnn' and dataset_name == 'uci':
         net_glob = UCI_CNN(num_classes=6).to(device)
     elif model_name == 'cnn' and dataset_name == 'realworld':
@@ -311,4 +309,3 @@ def my_exit(exit_sleep):
     time.sleep(exit_sleep)  # sleep for a while before exit
     logger.info("########## PYTHON SHUTTING DOWN! ##########")
     exit(0)
-
