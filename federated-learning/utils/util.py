@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import json
 import logging
+import os
 import socket
 import threading
 import time
@@ -312,4 +313,4 @@ def record_log(user_id, epoch, time_list, acc_list, clean=False):
 def my_exit(exit_sleep):
     time.sleep(exit_sleep)  # sleep for a while before exit
     logger.info("########## PYTHON SHUTTING DOWN! ##########")
-    exit(0)
+    os._exit(0)
