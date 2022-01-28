@@ -80,6 +80,7 @@ function main() {
                 arrangeOutput ${model} ${dataset} "${scheme}_100"
                 echo "[`date`] ## ${scheme}_100 done ##"
             fi
+        done
     done
 }
 
