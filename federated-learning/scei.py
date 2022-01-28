@@ -7,6 +7,8 @@ import sys
 import time
 import numpy as np
 import threading
+
+import torch
 from flask import Flask, request
 
 import utils.util
@@ -179,6 +181,8 @@ def receive_global_w(trainer_uuid, w_glob_compressed):
     for alpha in negotiate_step_list:
         w_local_tmp = {}
         for key in w_glob.keys():
+            if env_store.args.device != torch.device('cpu'):
+                w_glob[key] = w_glob[key].to(env_store.args.device)
             w_local_tmp[key] = alpha * trainer.model_store.my_local_model[key] + (1 - alpha) * w_glob[key]
 
         # test new tmp local model
@@ -237,7 +241,7 @@ def find_optimal_alpha_acc(select_strategy, acc_alpha_maps):
             acc_sum += acc_alpha_map[alpha]
         if acc_sum > max_acc:
             max_alpha = alpha
-    logger.debug("found optimal alpha {} with average accuracy: {}".format(max_alpha, max_acc/num_users))
+    logger.debug("found optimal alpha {} with average accuracy: {}".format(max_alpha, max_acc / num_users))
     return max_alpha
 
 
@@ -248,6 +252,9 @@ def round_finish(trainer_uuid, optimal_alpha):
     w_tmp = {}
     optimal_alpha = float(optimal_alpha)
     for key in trainer.model_store.my_global_model.keys():
+        if env_store.args.device != torch.device('cpu'):
+            trainer.model_store.my_global_model[key] = \
+                trainer.model_store.my_global_model[key].to(env_store.args.device)
         w_tmp[key] = optimal_alpha * trainer.model_store.my_local_model[key] + \
                      (1 - optimal_alpha) * trainer.model_store.my_global_model[key]
     trainer.model_store.my_local_model = w_tmp
@@ -331,7 +338,7 @@ def my_route(app):
                     data.get("uuid"), data.get("from_ip"), env_store.args.fl_listen_port,
                     env_store.args.num_users)).start()
             elif message == "shutdown":
-                threading.Thread(target=utils.util.my_exit, args=(env_store.args.exit_sleep, )).start()
+                threading.Thread(target=utils.util.my_exit, args=(env_store.args.exit_sleep,)).start()
             response = {"status": status, "detail": detail}
             return response
 
