@@ -53,6 +53,7 @@ class Trainer:
         communication_duration = 0
         if record_communication_time:
             communication_duration = reset_communication_time()
+            communication_duration += self.committee_elect_duration
         if communication_duration < 0.001:
             communication_duration = 0.0
         test_start_time = time.time()
