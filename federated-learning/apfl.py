@@ -180,7 +180,7 @@ def load_uuid():
 
 
 def load_global_model(epochs):
-    print("epochs: {}, global model version: {}".format(epochs, central_model_store.global_model_version))
+    logger.debug("epochs: {}, global model version: {}".format(epochs, central_model_store.global_model_version))
     if epochs == central_model_store.global_model_version:
         detail = {
             "global_model": central_model_store.global_model_compressed,
