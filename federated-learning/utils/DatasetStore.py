@@ -80,7 +80,7 @@ class LocalDataset:
             # Retrieve data directly from Stanford data source
             # !wget http://cs231n.stanford.edu/tiny-imagenet-200.zip
             trans = transforms.Compose(
-                [transforms.Resize(256), transforms.CenterCrop(224), transforms.RandomHorizontalFlip(),
+                [transforms.Resize(64), transforms.CenterCrop(32), transforms.RandomHorizontalFlip(),
                  transforms.ToTensor()])
             data_path = os.path.join(real_path, "../../data/imagenet/")
             train_dir = os.path.join(data_path, 'train')

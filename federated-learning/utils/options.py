@@ -10,10 +10,9 @@ def args_parser():
     # classic FL settings
     parser.add_argument('--epochs', type=int, default=50, help="rounds of training")
     parser.add_argument('--num_users', type=int, default=2, help="number of users: K")
-    parser.add_argument('--frac', type=float, default=1.0, help="the fraction of clients: C")
     parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs: E")
-    parser.add_argument('--local_bs', type=int, default=10, help="local batch size: B")
-    parser.add_argument('--local_test_bs', type=int, default=128, help="test batch size")
+    parser.add_argument('--local_bs', type=int, default=2, help="local batch size: B")
+    parser.add_argument('--local_test_bs', type=int, default=8, help="test batch size")
     parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
 
@@ -33,7 +32,7 @@ def args_parser():
     # ip address that is used to test local IP
     parser.add_argument('--test_ip_addr', type=str, default="10.150.187.13", help="ip address used to test local IP")
     # sleep for several seconds before start train
-    parser.add_argument('--start_sleep', type=int, default=60, help="sleep for seconds before start train")
+    parser.add_argument('--start_sleep', type=int, default=30, help="sleep for seconds before start train")
     # sleep for several seconds before exit python
     parser.add_argument('--exit_sleep', type=int, default=60, help="sleep for seconds before exit python")
 
