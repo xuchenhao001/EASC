@@ -30,5 +30,4 @@ function main() {
     done
 }
 
-# main > test.log 2>&1 &
-main
+main > test.log 2>&1 &
