@@ -186,6 +186,10 @@ def post_msg_trigger(trigger_url, body_data):
         return response.get("detail")
 
 
+def post_msg_blockchain(body_data, num_users):
+    simu_http_post("blockchain", body_data, num_users)
+
+
 def __conver_numpy_value_to_tensor(numpy_data):
     tensor_data = copy.deepcopy(numpy_data)
     for key, value in tensor_data.items():

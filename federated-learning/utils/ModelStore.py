@@ -81,7 +81,7 @@ class PersonalModelStore:
 
 class APFLPersonalModelStore(PersonalModelStore):
     def __init__(self):
-        PersonalModelStore.__init__(self)
+        super().__init__()
         # for apfl
         self.difference1 = None
         self.difference2 = None
@@ -109,3 +109,13 @@ class APFLPersonalModelStore(PersonalModelStore):
 
     def update_difference2(self, difference2):
         self.difference2 = copy.deepcopy(difference2)
+
+
+class AsyncCentralModelStore(CentralModelStore):
+    def __init__(self):
+        super().__init__()
+        self.optimal_alpha = 1.0
+
+    def async_acc_alpha_add(self, local_uuid, acc_alpha_map):
+        self.acc_alpha_maps[local_uuid] = acc_alpha_map
+        logger.debug("Received new acc_alpha_map from user {}.".format(local_uuid))

@@ -2,8 +2,7 @@ import logging
 import time
 
 from utils.ModelStore import PersonalModelStore, APFLPersonalModelStore
-from utils.util import model_loader, ColoredLogger, test_model, train_model, record_log, reset_communication_time, \
-    simu_http_post
+from utils.util import model_loader, ColoredLogger, test_model, train_model, record_log, reset_communication_time
 
 logging.setLoggerClass(ColoredLogger)
 logger = logging.getLogger("Trainer")
@@ -60,6 +59,7 @@ class Trainer:
         acc_local, acc_local_skew1, acc_local_skew2, acc_local_skew3, acc_local_skew4 = self.evaluate_model(dataset,
                                                                                                             args)
         test_duration = time.time() - test_start_time
+        test_duration += self.round_test_duration
         total_duration = time.time() - self.init_time
         round_duration = time.time() - self.round_start_time
         train_duration = self.round_train_duration
@@ -67,9 +67,6 @@ class Trainer:
                    [total_duration, round_duration, train_duration, test_duration, communication_duration],
                    [acc_local, acc_local_skew1, acc_local_skew2, acc_local_skew3, acc_local_skew4], clean=clean)
         return acc_local, acc_local_skew1, acc_local_skew2, acc_local_skew3, acc_local_skew4
-
-    def post_msg_blockchain(self, body_data, num_users):
-        simu_http_post("blockchain", body_data, num_users)
 
     def is_first_epoch(self):
         return self.epoch == 1

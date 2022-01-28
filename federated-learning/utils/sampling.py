@@ -49,17 +49,10 @@ def mnist_noniid(dataset, num_users):
 
 
 def get_indices(labels, user_labels, n_samples):
-    # print("labels: {}".format(labels))
-    # print("user_labels: {}".format(user_labels))
-    # print("n_samples: {}".format(n_samples))
     indices = []
     for selected_label in user_labels:
-        # print("selected_label: {}".format(selected_label))
         label_samples = np.where(labels[1, :] == selected_label)
-        # print("label_samples: {}".format(label_samples))
         label_indices = labels[0, label_samples]
-        # print("label_indices: {}".format(label_indices))
-        # print("random choice: {}, {}".format(label_indices[0], n_samples))
         selected_indices = list(np.random.choice(label_indices[0], n_samples, replace=False))
         indices += selected_indices
     return indices
@@ -106,6 +99,8 @@ def noniid_onepass(dataset_train, dataset_test, num_users, dataset_name='mnist',
     for i in range(num_users):
         user_labels = np.random.choice(labels, size=kept_class, replace=False)
         skew_labels = [i for i in labels if i not in user_labels]
+        if len(skew_labels) > 6:  # at most skew 6 classes of data
+            skew_labels = np.random.choice(skew_labels, size=6, replace=False)
         train_indices = get_indices(train_labels, user_labels, n_samples=samples[0])
         test_indices = get_indices(test_labels, user_labels, n_samples=samples[1])
 

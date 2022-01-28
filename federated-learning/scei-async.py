@@ -13,17 +13,17 @@ import utils.util
 from utils.CentralStore import IPCount
 from utils.DatasetStore import LocalDataset
 from utils.EnvStore import EnvStore
-from utils.ModelStore import CentralModelStore
+from utils.ModelStore import AsyncCentralModelStore
 from utils.Trainer import Trainer
-from models.Fed import fed_avg
+from models.Fed import async_fed_avg
 
 logging.setLoggerClass(utils.util.ColoredLogger)
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
-logger = logging.getLogger("scei")
+logger = logging.getLogger("scei-async")
 
 env_store = EnvStore()
 local_dataset = LocalDataset()
-central_model_store = CentralModelStore()
+central_model_store = AsyncCentralModelStore()
 ipCount = IPCount()
 trainer_pool = {}  # multiple thread trainers stored in this map
 
@@ -56,14 +56,7 @@ def prepare_committee(trainer_uuid):
 
     if trainer.is_first_epoch():
         trainer.init_time = time.time()
-        # download initial global model
-        body_data = {
-            "message": "global_model",
-            "epochs": -1,
-        }
-        detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
-        global_model_compressed = detail.get("global_model")
-        w_glob = utils.util.decompress_tensor(global_model_compressed)
+        w_glob = fetch_global_model()
         trainer.model_store.update_my_global_model(w_glob)
 
     # re-elect the committee members
@@ -99,14 +92,7 @@ def train(trainer_uuid):
 
     # calculate initial model accuracy, record it as the benchmark.
     if trainer.is_first_epoch():
-        # download initial global model
-        body_data = {
-            "message": "global_model",
-            "epochs": -1,
-        }
-        detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
-        global_model_compressed = detail.get("global_model")
-        w_glob = utils.util.decompress_tensor(global_model_compressed)
+        w_glob = fetch_global_model()
         trainer.model_store.update_my_global_model(w_glob)
         trainer.load_model(w_glob)
         trainer.evaluate_model_with_log(local_dataset, env_store.args, record_epoch=0, clean=True)
@@ -138,33 +124,32 @@ def train(trainer_uuid):
     }
     utils.util.post_msg_blockchain(body_data, env_store.args.num_users)
 
+    # finished uploading local model, fetch latest global model and calculate alpha
+    fetch_latest_global_w(trainer.uuid)
+
 
 def gather_local_w(local_uuid, from_ip, w_compressed):
     ipCount.set_map(local_uuid, from_ip)
-    if central_model_store.local_models_add_count(local_uuid, utils.util.decompress_tensor(w_compressed),
-                                                  env_store.args.num_users):
-        logger.debug("Gathered enough w, average and release them")
-        w_glob = fed_avg(central_model_store.local_models, central_model_store.global_model, env_store.args.device)
-        # reset local models after aggregation
-        central_model_store.local_models_reset()
-        # save global model
-        central_model_store.update_global_model(w_glob)
-        for uuid in ipCount.get_keys():
-            body_data = {
-                "message": "release_global_w",
-                "w_compressed": central_model_store.global_model_compressed,
-                "uuid": uuid,
-            }
-            my_url = "http://" + ipCount.get_map(uuid) + ":" + str(env_store.args.fl_listen_port) + "/trigger"
-            utils.util.http_client_post(my_url, body_data)
+
+    logger.debug("aggregate global model after received a new local model.")
+    w_local = utils.util.decompress_tensor(w_compressed)
+    w_glob = async_fed_avg(w_local, central_model_store.global_model, env_store.args.device)
+    # save global model
+    central_model_store.update_global_model(w_glob)
+    # send the hash of the global model to the ledger
+    body_data = {
+        'message': 'UploadGlobalModelHash',
+        'data': {
+            'global_model_hash': central_model_store.global_model_hash,
+        },
+    }
+    utils.util.post_msg_blockchain(body_data, env_store.args.num_users)
 
 
-def receive_global_w(trainer_uuid, w_glob_compressed):
+def fetch_latest_global_w(trainer_uuid):
     trainer = trainer_pool[trainer_uuid]
-    logger.debug("Received latest global model for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
-
-    # load hash of new global model, which is downloaded from the leader
-    w_glob = utils.util.decompress_tensor(w_glob_compressed)
+    logger.debug("fetch latest global model for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
+    w_glob = fetch_global_model()
     trainer.model_store.update_my_global_model(w_glob)
 
     # test different alpha values with their accuracies
@@ -198,37 +183,33 @@ def receive_global_w(trainer_uuid, w_glob_compressed):
     logger.debug('finished testing acc-alpha map, send accuracy and alpha map to the ledger')
     utils.util.post_msg_trigger(env_store.trigger_url, body_data)
 
+    # fetch the latest optimal alpha and finish the round
+    round_finish(trainer.uuid)
+
 
 def gather_acc_alpha_map(acc_alpha_map, local_uuid, from_ip):
     ipCount.set_map(local_uuid, from_ip)
-    if central_model_store.acc_alpha_add_count(local_uuid, acc_alpha_map, env_store.args.num_users):
-        logger.debug("Gathered enough accuracy and alpha, find optimal alpha")
-        optimal_alpha = find_optimal_alpha_acc("Max", central_model_store.acc_alpha_maps)
-        # reset acc_alpha map
-        central_model_store.acc_alpha_reset()
-        # send optimal alpha to blockchain
-        body_data = {
-            'message': 'OPTIMAL_ALPHA',
-            'data': {
-                'optimal_alpha': optimal_alpha,
-            },
-        }
-        utils.util.post_msg_blockchain(body_data, env_store.args.num_users)
-        # release optimal_alpha to each local node
-        for uuid in ipCount.get_keys():
-            body_data = {
-                "message": "release_optimal_alpha",
-                "optimal_alpha": optimal_alpha,
-                "uuid": uuid,
-            }
-            my_url = "http://" + ipCount.get_map(uuid) + ":" + str(env_store.args.fl_listen_port) + "/trigger"
-            utils.util.http_client_post(my_url, body_data)
+    # asynchronously update acc-alpha map
+    central_model_store.async_acc_alpha_add(local_uuid, acc_alpha_map)
+    optimal_alpha = find_optimal_alpha_acc("Max", central_model_store.acc_alpha_maps)
+    # store optimal alpha in central
+    central_model_store.optimal_alpha = optimal_alpha
+    # send optimal alpha to blockchain
+    body_data = {
+        'message': 'OPTIMAL_ALPHA',
+        'data': {
+            'optimal_alpha': optimal_alpha,
+        },
+    }
+    utils.util.post_msg_blockchain(body_data, env_store.args.num_users)
 
 
 def find_optimal_alpha_acc(select_strategy, acc_alpha_maps):
     logger.debug("[Find Alpha] According to max acc_test average policy")
-    alphas = acc_alpha_maps[1].keys()
     num_users = len(acc_alpha_maps)
+    if num_users == 0:
+        return 1.0  # default optimal alpha is 1.0
+    alphas = acc_alpha_maps[list(acc_alpha_maps.keys())[0]].keys()
     max_acc = 0
     max_alpha = list(alphas)[0]
     for alpha in alphas:
@@ -241,9 +222,10 @@ def find_optimal_alpha_acc(select_strategy, acc_alpha_maps):
     return max_alpha
 
 
-def round_finish(trainer_uuid, optimal_alpha):
+def round_finish(trainer_uuid):
     trainer = trainer_pool[trainer_uuid]
-    logger.debug("Received optimal alpha for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
+    logger.debug("fetch optimal alpha for user: {}, epoch: {}.".format(trainer.uuid, trainer.epoch))
+    optimal_alpha = fetch_optimal_alpha()
     # calculate new private local model according to the alpha
     w_tmp = {}
     optimal_alpha = float(optimal_alpha)
@@ -285,15 +267,36 @@ def load_uuid():
     return detail
 
 
-def load_global_model(epochs):
-    if epochs == central_model_store.global_model_version:
-        detail = {
-            "global_model": central_model_store.global_model_compressed,
-        }
-    else:
-        detail = {
-            "global_model": None,
-        }
+def fetch_global_model():
+    body_data = {
+        "message": "fetch_global_model"
+    }
+    detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
+    global_model_compressed = detail.get("global_model")
+    w_glob = utils.util.decompress_tensor(global_model_compressed)
+    return w_glob
+
+
+def load_global_model():
+    detail = {
+        "global_model": central_model_store.global_model_compressed,
+    }
+    return detail
+
+
+def fetch_optimal_alpha():
+    body_data = {
+        "message": "fetch_optimal_alpha"
+    }
+    detail = utils.util.post_msg_trigger(env_store.trigger_url, body_data)
+    optimal_alpha = detail.get("optimal_alpha")
+    return optimal_alpha
+
+
+def load_optimal_alpha():
+    detail = {
+        "optimal_alpha": central_model_store.optimal_alpha,
+    }
     return detail
 
 
@@ -314,18 +317,16 @@ def my_route(app):
             message = data.get("message")
             if message == "fetch_uuid":
                 detail = load_uuid()
-            elif message == "global_model":
-                detail = load_global_model(data.get("epochs"))
+            elif message == "fetch_global_model":
+                detail = load_global_model()
+            elif message == "fetch_optimal_alpha":
+                detail = load_optimal_alpha()
             elif message == "upload_local_w":
                 threading.Thread(target=gather_local_w, args=(
                     data.get("uuid"), data.get("from_ip"), data.get("w_compressed"))).start()
-            elif message == "release_global_w":
-                threading.Thread(target=receive_global_w, args=(data.get("uuid"), data.get("w_compressed"))).start()
             elif message == "acc_alpha_map":
                 threading.Thread(target=gather_acc_alpha_map, args=(data.get("acc_alpha_map"), data.get("uuid"),
                                                                     data.get("from_ip"),)).start()
-            elif message == "release_optimal_alpha":
-                threading.Thread(target=round_finish, args=(data.get("uuid"), data.get("optimal_alpha"))).start()
             elif message == "shutdown_python":
                 threading.Thread(target=utils.util.shutdown_count, args=(
                     data.get("uuid"), data.get("from_ip"), env_store.args.fl_listen_port,

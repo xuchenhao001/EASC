@@ -86,7 +86,7 @@ def train(trainer_uuid):
         'uuid': trainer.uuid,
         'epochs': trainer.epoch,
     }
-    trainer.post_msg_blockchain(body_data, env_store.args.num_users)
+    utils.util.post_msg_blockchain(body_data, env_store.args.num_users)
 
 
 def gather_local_w(local_uuid, from_ip, w_compressed):
