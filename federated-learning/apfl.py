@@ -6,6 +6,8 @@ import sys
 import time
 import numpy as np
 import threading
+
+import torch
 from flask import Flask, request
 
 import utils
@@ -86,6 +88,9 @@ def train(trainer_uuid, w_global_local_compressed=None):
         train_start_time = time.time()
         # compute v_bar
         for j in trainer.model_store.w_glob.keys():
+            if env_store.args.device != torch.device('cpu'):
+                trainer.model_store.w_locals[j] = trainer.model_store.w_locals[j].to(env_store.args.device)
+                trainer.model_store.w_glob_local[j] = trainer.model_store.w_glob_local[j].to(env_store.args.device)
             trainer.model_store.w_locals_per[j] = trainer.hyper_para * trainer.model_store.w_locals[j] + \
                                           (1 - trainer.hyper_para) * trainer.model_store.w_glob_local[j]
             trainer.model_store.difference1[j] = trainer.model_store.w_locals[j] - trainer.model_store.w_glob_local[j]
@@ -105,9 +110,9 @@ def train(trainer_uuid, w_global_local_compressed=None):
 
         correlation = 0.0
         for j in trainer.model_store.w_glob.keys():
-            d = trainer.model_store.difference1[j].numpy()
+            d = trainer.model_store.difference1[j].detach().cpu().numpy()
             d1 = np.ndarray.flatten(d)
-            d = trainer.model_store.difference2[j].numpy()
+            d = trainer.model_store.difference2[j].detach().cpu().numpy()
             d2 = np.ndarray.flatten(d)
             correlation = correlation + np.dot(d1, d2)
         correlation = correlation / len(trainer.model_store.w_glob.keys())
@@ -117,6 +122,9 @@ def train(trainer_uuid, w_global_local_compressed=None):
 
         # update local personalized weight
         for j in trainer.model_store.w_glob.keys():
+            if env_store.args.device != torch.device('cpu'):
+                trainer.model_store.w_locals[j] = trainer.model_store.w_locals[j].to(env_store.args.device)
+                trainer.model_store.w_glob_local[j] = trainer.model_store.w_glob_local[j].to(env_store.args.device)
             trainer.model_store.w_locals_per[j] = trainer.hyper_para * trainer.model_store.w_locals[j] + \
                                           (1 - trainer.hyper_para) * trainer.model_store.w_glob_local[j]
         trainer.round_train_duration = time.time() - train_start_time
