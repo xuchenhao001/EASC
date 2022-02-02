@@ -29,19 +29,6 @@ function main() {
                 echo "[`date`] ## ${scheme}_005 done ##"
             fi
 
-            if [[ ! -d "${model}-${dataset}/${scheme}_010" ]]; then
-                echo "[`date`] ## ${scheme}_010 start ##"
-                clean
-                PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --num_users=10"
-                cd $PWD/../federated-learning/; $PYTHON_CMD > $PWD/../server.log 2>&1 &
-                cd -
-                # detect test finish or not
-                testFinish "${scheme}"
-                # gather output, move to the right directory
-                arrangeOutput ${model} ${dataset} "${scheme}_010"
-                echo "[`date`] ## ${scheme}_010 done ##"
-            fi
-
             if [[ ! -d "${model}-${dataset}/${scheme}_020" ]]; then
                 echo "[`date`] ## ${scheme}_020 start ##"
                 clean
