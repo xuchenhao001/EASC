@@ -1,6 +1,6 @@
 import sys
 
-from plot.utils.skew import plot_skew
+from plot.utils import plot_skew
 
 fed_server = [94.62, 95.09, 95.33, 95.94, 95.85, 95.75, 94.95, 95.19, 95.8, 96.04, 95.28, 96.65, 95.9, 95.9, 95.61, 96.75, 96.23, 95.9, 96.37, 96.65, 96.98, 96.65, 96.7, 97.03, 96.93, 96.75, 97.12, 96.56, 96.75, 96.75]
 main_nn = [92.64, 92.5, 92.36, 92.45, 92.41, 92.36, 92.45, 92.64, 92.59, 92.26, 92.55, 92.45, 92.55, 92.78, 92.74, 92.55, 92.45, 92.69, 92.5, 92.59, 92.64, 92.5, 92.55, 92.83, 92.74, 92.59, 92.64, 92.74, 92.83, 92.59]
@@ -13,4 +13,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_skew("", data, save_path)
+plot_skew("", data, False, False, save_path, plot_size="4")
