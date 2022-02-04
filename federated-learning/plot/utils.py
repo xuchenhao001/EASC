@@ -65,7 +65,7 @@ def get_color_settings():
 
 
 def get_cycler_settings():
-    my_cycler = cycler(color=get_color_settings)
+    my_cycler = cycler(color=get_color_settings())
     return my_cycler
 
 
@@ -104,7 +104,7 @@ def plot_round_acc(title, scei, scei_async, apfl, fedavg, local, in_legend=False
     plt.xticks(**font_settings.get("cs_xy_ticks_font"))
     plt.yticks(**font_settings.get("cs_xy_ticks_font"))
     plt.tight_layout()
-    # plt.xlim(0, xrange)
+    # plt.ylim(bottom=70)
     if in_legend:
         plt.legend(prop=font_settings.get("legend_font"), loc='lower right').set_zorder(11)
     plt.grid()
