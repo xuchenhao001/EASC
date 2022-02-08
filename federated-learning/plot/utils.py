@@ -31,8 +31,10 @@ def get_font_settings(size):
         fig_height = 4
     else:
         font_size_dict = {"l": 25, "m": 25, "s": 20}
-        fig_width = 6.4
-        fig_height = 4.8
+        # fig_width = 6.4
+        # fig_height = 4.8
+        fig_width = 7.4
+        fig_height = 3.7
 
     xy_label_font = font_manager.FontProperties(
         family='Times New Roman', weight='bold', style='normal', size=font_size_dict["l"])
@@ -150,7 +152,7 @@ def plot_round_acc_alpha(title, scei, fedavg, alpha025, alpha050, alpha075, loca
     else:
         plt.show()
     if ex_legend:
-        plot_legend_head(axes, 5, 20.6, 0.7, save_path, plot_size)
+        plot_legend_head(axes, 6, 20.6, 0.7, save_path, plot_size)
 
 
 def plot_time_cost(title, scei, scei_async, apfl, fedavg, local=None, in_legend=False, ex_legend=False, save_path=None, plot_size="3"):
@@ -185,7 +187,10 @@ def plot_time_cost(title, scei, scei_async, apfl, fedavg, local=None, in_legend=
     else:
         plt.show()
     if ex_legend:
-        plot_legend_head(axes, 5, 20.6, 0.7, save_path, plot_size)
+        if local is not None:
+            plot_legend_head(axes, 5, 20.6, 0.7, save_path, plot_size)
+        else:
+            plot_legend_head(axes, 4, 20.6, 0.7, save_path, plot_size)
 
 
 def plot_round_acc_nodes(title, scei005, scei010, scei020, scei050, scei100, in_legend=False, ex_legend=False, save_path=None, plot_size="3"):

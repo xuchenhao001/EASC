@@ -11,4 +11,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_time_cost("", scei, scei_async, apfl, fedavg, None, True, False, save_path, plot_size="3")
+plot_time_cost("", scei, scei_async, apfl, fedavg, None, False, False, save_path, plot_size="4")

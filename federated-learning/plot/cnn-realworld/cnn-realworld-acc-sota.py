@@ -12,4 +12,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_round_acc("", scei, scei_async, apfl, fedavg, local, True, False, save_path, plot_size="3")
+plot_round_acc("", scei, scei_async, apfl, fedavg, local, False, False, save_path, plot_size="4")
