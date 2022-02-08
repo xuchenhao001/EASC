@@ -140,6 +140,7 @@ def plot_round_acc_alpha(title, scei, fedavg, alpha025, alpha050, alpha075, loca
     plt.yticks(**font_settings.get("cs_xy_ticks_font"))
     plt.tight_layout()
     # plt.xlim(0, xrange)
+    # plt.ylim(bottom=80)
     if in_legend:
         plt.legend(prop=font_settings.get("legend_font"), loc='lower right').set_zorder(11)
     plt.grid()
