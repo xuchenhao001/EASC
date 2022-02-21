@@ -28,6 +28,7 @@ def extract_files_lines(experiment_path):
     for result_file in result_files:
         file_path = os.path.join(experiment_path, result_file)
         file_numbers_2d = parse_lines_filtered(file_path)  # parse each file into two dimensional array
+        # print("file: {}, len: {}".format(result_file, len(file_numbers_2d)))
         files_numbers_3d.append(file_numbers_2d)
     return files_numbers_3d
 
