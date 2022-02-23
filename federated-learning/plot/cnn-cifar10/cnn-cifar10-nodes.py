@@ -12,5 +12,4 @@ save_path = None
 if len(sys.argv) == 3 and sys.argv[1] and sys.argv[1] == "save":
     save_path = sys.argv[2]
 
-plot_round_acc_nodes("", scei005, scei010, scei020, scei050, scei100, False, True, save_path, plot_size="4")
-# plot_round_acc_nodes("", scei005, scei010, scei020, scei050, scei100, True, False, save_path, plot_size="4")
+plot_round_acc_nodes("", scei005, scei010, scei020, scei050, scei100, False, False, save_path, plot_size="4")
