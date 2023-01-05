@@ -34,7 +34,7 @@ def get_font_settings(size):
         # fig_width = 6.4
         # fig_height = 4.8
         fig_width = 7.4
-        fig_height = 3.7
+        fig_height = 4
 
     xy_label_font = font_manager.FontProperties(
         family='Times New Roman', weight='bold', style='normal', size=font_size_dict["l"])
@@ -79,8 +79,8 @@ def plot_legend_head(axes, legend_column, width, height, save_path=None, plot_si
     figlegend.tight_layout()
     figlegend.set_size_inches(width, height)
     if save_path:
-        save_path = save_path[:-4] + "-legend.png"
-        figlegend.savefig(save_path)
+        save_path = save_path[:-4] + "-legend.eps"
+        figlegend.savefig(save_path, format='eps')
     else:
         figlegend.show()
 
@@ -112,7 +112,7 @@ def plot_round_acc(title, scei, scei_async, apfl, fedavg, local, in_legend=False
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, format='eps')
     else:
         plt.show()
     if ex_legend:
@@ -148,7 +148,7 @@ def plot_round_acc_alpha(title, scei, fedavg, alpha025, alpha050, alpha075, loca
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, format='eps')
     else:
         plt.show()
     if ex_legend:
@@ -183,7 +183,7 @@ def plot_time_cost(title, scei, scei_async, apfl, fedavg, local=None, in_legend=
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, format='eps')
     else:
         plt.show()
     if ex_legend:
@@ -220,7 +220,7 @@ def plot_round_acc_nodes(title, scei005, scei010, scei020, scei050, scei100, in_
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, format='eps')
     else:
         plt.show()
     if ex_legend:
@@ -257,7 +257,7 @@ def plot_skew(title, data, in_legend=False, ex_legend=False, save_path=None, plo
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path, format='eps')
     else:
         plt.show()
     if ex_legend:
