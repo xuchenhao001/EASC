@@ -227,27 +227,24 @@ def plot_round_acc_nodes(title, scei005, scei010, scei020, scei050, scei100, in_
         plot_legend_head(axes, 5, 20.6, 0.7, save_path, plot_size)
 
 
-# fed_server = []
-# main_nn = []
-# main_fed = []
-# data = {'SCEI': fed_server, 'Local': main_nn, 'APFL': main_fed_localA, 'FedAvg': main_fed}
 def plot_skew(title, data, in_legend=False, ex_legend=False, save_path=None, plot_size="3"):
     font_settings = get_font_settings(plot_size)
-    color_settings = get_color_settings()
+    x = ["5%", "10%", "15%", "20%"]
 
-    df = pd.DataFrame.from_dict(data=data)
-
+    width = 0.15  # the width of the bars
+    capsize = 3
     fig, axes = plt.subplots()
-    medianprops = dict(linewidth=2, color='black')
-    bplot = axes.boxplot(df, labels=data.keys(), medianprops=medianprops, patch_artist=True)
+    axes.bar([(p - width * 2) for p in range(len(x))], height=data["scei_y"], yerr=data["scei_err"], capsize=capsize, width=width, label="SCEI", hatch='x')
+    axes.bar([p - width for p in range(len(x))], height=data["sceia_y"], yerr=data["sceia_err"], capsize=capsize, width=width, label="SCEI-Async", hatch='o')
+    axes.bar(range(len(x)), height=data["apfl_y"], yerr=data["apfl_err"], capsize=capsize, width=width, label="APFL", hatch='.')
+    axes.bar([p + width for p in range(len(x))], height=data["fedavg_y"], yerr=data["fedavg_err"], capsize=capsize, width=width, label="FedAvg", hatch='*')
+    axes.bar([(p + width * 2) for p in range(len(x))], height=data["local_y"], yerr=data["local_err"], capsize=capsize, width=width, label="Local", hatch='/')
 
-    # fill with colors
-    for patch, color in zip(bplot['boxes'], color_settings):
-        patch.set_facecolor(color)
+    plt.xticks(range(len(x)), x)
+    plt.xlabel("Data Skew Level", **font_settings.get("cs_xy_label_font"))
+    plt.ylabel("Accuracy (%)", **font_settings.get("cs_xy_label_font"))
 
     plt.title(title, **font_settings.get("cs_title_font"))
-    plt.xlabel("Scheme", **font_settings.get("cs_xy_label_font"))
-    plt.ylabel("Accuracy (%)", **font_settings.get("cs_xy_label_font"))
     plt.xticks(**font_settings.get("cs_xy_ticks_font"))
     plt.yticks(**font_settings.get("cs_xy_ticks_font"))
     plt.tight_layout()
