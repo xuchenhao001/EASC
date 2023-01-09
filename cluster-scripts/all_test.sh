@@ -21,6 +21,7 @@ function main() {
                 cd $PWD/../federated-learning/; $PYTHON_CMD > $PWD/../server.log 2>&1 &
                 cd -
                 # detect test finish or not
+                sleep 30
                 testFinish "${scheme}"
                 # gather output, move to the right directory
                 arrangeOutput ${model} ${dataset} "${scheme}"

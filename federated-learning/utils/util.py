@@ -16,7 +16,7 @@ import numpy as np
 import requests
 import torch
 
-from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP, CNNImageNet
+from models.Nets import CNNCifar, CNNMnist, UCI_CNN, MLP, CNNImageNet, ResNet18, ResNet9
 from models.Test import test_img_total
 from models.Train import train_cnn_mlp
 from utils.blockchain import post_to_blockchain
@@ -98,6 +98,9 @@ def model_loader(model_name, dataset_name, device, img_size):
         net_glob = UCI_CNN(num_classes=6).to(device)
     elif model_name == 'cnn' and dataset_name == 'realworld':
         net_glob = UCI_CNN(num_classes=8).to(device)
+    elif model_name == 'resnet' and dataset_name == 'cifar10':
+        # net_glob = ResNet18(num_classes=10).to(device)
+        net_glob = ResNet9(3, 10).to(device)
     elif model_name == 'mlp':
         len_in = 1
         for x in img_size:
