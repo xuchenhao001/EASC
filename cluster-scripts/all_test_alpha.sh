@@ -16,7 +16,7 @@ function main() {
         if [[ ! -d "${model}-${dataset}/${scheme}_025" ]]; then
             echo "[`date`] ## ${scheme}_025 start ##"
             clean
-            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --hyperpara_static --hyperpara=0.25"
+            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --gpu=${GPU_NO} --hyperpara_static --hyperpara=0.25"
             cd $PWD/../federated-learning/; $PYTHON_CMD > $PWD/../server.log 2>&1 &
             cd -
             # detect test finish or not
@@ -31,7 +31,7 @@ function main() {
         if [[ ! -d "${model}-${dataset}/${scheme}_050" ]]; then
             echo "[`date`] ## ${scheme}_050 start ##"
             clean
-            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --hyperpara_static --hyperpara=0.5"
+            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --gpu=${GPU_NO} --hyperpara_static --hyperpara=0.5"
             cd $PWD/../federated-learning/; $PYTHON_CMD > $PWD/../server.log 2>&1 &
             cd -
             # detect test finish or not
@@ -46,7 +46,7 @@ function main() {
         if [[ ! -d "${model}-${dataset}/${scheme}_075" ]]; then
             echo "[`date`] ## ${scheme}_075 start ##"
             clean
-            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --hyperpara_static --hyperpara=0.75"
+            PYTHON_CMD="python3 -u ${scheme}.py --model=${model} --dataset=${dataset} --gpu=${GPU_NO} --hyperpara_static --hyperpara=0.75"
             cd $PWD/../federated-learning/; $PYTHON_CMD > $PWD/../server.log 2>&1 &
             cd -
             # detect test finish or not
@@ -58,6 +58,11 @@ function main() {
         fi
     done
 }
+
+GPU_NO=$1
+if [[ -z "${GPU_NO}" ]]; then
+    GPU_NO="-1"
+fi
 
 main > test.log 2>&1 &
 
