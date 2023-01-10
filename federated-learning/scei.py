@@ -266,7 +266,11 @@ def round_finish(trainer_uuid, optimal_alpha):
     trainer.epoch += 1
     if trainer.epoch <= env_store.args.epochs:
         logger.info("########## EPOCH #{} ##########".format(trainer.epoch))
-        prepare_committee(trainer.uuid)
+        body_data = {
+            "message": "prepare_committee",
+            "uuid": trainer.uuid,
+        }
+        utils.util.post_msg_trigger(env_store.trigger_url, body_data)
     else:
         logger.info("########## ALL DONE! ##########")
         body_data = {
@@ -307,7 +311,11 @@ def load_global_model(epochs):
 def start_train():
     time.sleep(env_store.args.start_sleep)
     trainer_uuid = init_trainer()
-    prepare_committee(trainer_uuid)
+    body_data = {
+        "message": "prepare_committee",
+        "uuid": trainer_uuid,
+    }
+    utils.util.post_msg_trigger(env_store.trigger_url, body_data)
 
 
 def my_route(app):
@@ -333,6 +341,8 @@ def my_route(app):
                                                                     data.get("from_ip"),)).start()
             elif message == "release_optimal_alpha":
                 threading.Thread(target=round_finish, args=(data.get("uuid"), data.get("optimal_alpha"))).start()
+            elif message == "prepare_committee":
+                threading.Thread(target=prepare_committee, args=(data.get("uuid"),)).start()
             elif message == "shutdown_python":
                 threading.Thread(target=utils.util.shutdown_count, args=(
                     data.get("uuid"), data.get("from_ip"), env_store.args.fl_listen_port,
