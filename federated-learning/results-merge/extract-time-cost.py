@@ -26,12 +26,12 @@ def extract_overall_cost(exp_node_number, model_name, dataset_name):
 
 
 def main():
-    exp_node_number = "all-test-v1"
-    model_name = "cnn"
+    exp_node_number = "all_test"
+    model_name = "resnet"
     dataset_name = "cifar10"
 
-    # extract_communication_cost(exp_node_number, model_name, dataset_name)
-    extract_overall_cost(exp_node_number, model_name, dataset_name)
+    extract_communication_cost(exp_node_number, model_name, dataset_name)
+    # extract_overall_cost(exp_node_number, model_name, dataset_name)
 
 
 if __name__ == "__main__":

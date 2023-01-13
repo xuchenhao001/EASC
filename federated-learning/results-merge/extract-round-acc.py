@@ -4,8 +4,8 @@ from utils import calculate_average_across_files
 
 
 def extract_round_acc():
-    exp_node_number = "all-test-v1"
-    model_name = "cnn"
+    exp_node_number = "all_test"
+    model_name = "resnet"
     dataset_name = "cifar10"
 
     experiment_names = ["apfl", "fedavg", "local", "scei", "scei-async"]
