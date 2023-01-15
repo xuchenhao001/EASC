@@ -234,11 +234,11 @@ def plot_skew(title, data, in_legend=False, ex_legend=False, save_path=None, plo
     width = 0.15  # the width of the bars
     capsize = 3
     fig, axes = plt.subplots()
-    axes.bar([(p - width * 2) for p in range(len(x))], height=data["scei_y"], yerr=data["scei_err"], capsize=capsize, width=width, label="SCEI", hatch='x')
-    axes.bar([p - width for p in range(len(x))], height=data["sceia_y"], yerr=data["sceia_err"], capsize=capsize, width=width, label="SCEI-Async", hatch='o')
-    axes.bar(range(len(x)), height=data["apfl_y"], yerr=data["apfl_err"], capsize=capsize, width=width, label="APFL", hatch='.')
-    axes.bar([p + width for p in range(len(x))], height=data["fedavg_y"], yerr=data["fedavg_err"], capsize=capsize, width=width, label="FedAvg", hatch='*')
-    axes.bar([(p + width * 2) for p in range(len(x))], height=data["local_y"], yerr=data["local_err"], capsize=capsize, width=width, label="Local", hatch='/')
+    axes.bar([(p - width * 2) for p in range(len(x))], height=data["scei_y"], yerr=data["scei_err"], capsize=capsize, width=width, label="SCEI", hatch='/')
+    axes.bar([p - width for p in range(len(x))], height=data["sceia_y"], yerr=data["sceia_err"], capsize=capsize, width=width, label="SCEI-Async", hatch='\\')
+    axes.bar(range(len(x)), height=data["apfl_y"], yerr=data["apfl_err"], capsize=capsize, width=width, label="APFL", hatch='+')
+    axes.bar([p + width for p in range(len(x))], height=data["fedavg_y"], yerr=data["fedavg_err"], capsize=capsize, width=width, label="FedAvg", hatch='x')
+    axes.bar([(p + width * 2) for p in range(len(x))], height=data["local_y"], yerr=data["local_err"], capsize=capsize, width=width, label="Local", hatch='.')
 
     plt.xticks(range(len(x)), x)
     plt.xlabel("Data Skew Level", **font_settings.get("cs_xy_label_font"))
