@@ -79,8 +79,8 @@ def plot_legend_head(axes, legend_column, width, height, save_path=None, plot_si
     figlegend.tight_layout()
     figlegend.set_size_inches(width, height)
     if save_path:
-        save_path = save_path[:-4] + "-legend.eps"
-        figlegend.savefig(save_path, format='eps')
+        save_path = save_path[:-4] + "-legend.pdf"
+        figlegend.savefig(save_path, format='pdf')
     else:
         figlegend.show()
 
@@ -112,7 +112,7 @@ def plot_round_acc(title, scei, scei_async, apfl, fedavg, local, in_legend=False
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path, format='eps')
+        plt.savefig(save_path, format='pdf')
     else:
         plt.show()
     if ex_legend:
@@ -148,7 +148,7 @@ def plot_round_acc_alpha(title, scei, fedavg, alpha025, alpha050, alpha075, loca
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path, format='eps')
+        plt.savefig(save_path, format='pdf')
     else:
         plt.show()
     if ex_legend:
@@ -183,7 +183,7 @@ def plot_time_cost(title, scei, scei_async, apfl, fedavg, local=None, in_legend=
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path, format='eps')
+        plt.savefig(save_path, format='pdf')
     else:
         plt.show()
     if ex_legend:
@@ -220,7 +220,7 @@ def plot_round_acc_nodes(title, scei005, scei010, scei020, scei050, scei100, in_
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path, format='eps')
+        plt.savefig(save_path, format='pdf')
     else:
         plt.show()
     if ex_legend:
@@ -234,11 +234,11 @@ def plot_skew(title, data, in_legend=False, ex_legend=False, save_path=None, plo
     width = 0.15  # the width of the bars
     capsize = 3
     fig, axes = plt.subplots()
-    axes.bar([(p - width * 2) for p in range(len(x))], height=data["scei_y"], yerr=data["scei_err"], capsize=capsize, width=width, label="SCEI", hatch='/')
-    axes.bar([p - width for p in range(len(x))], height=data["sceia_y"], yerr=data["sceia_err"], capsize=capsize, width=width, label="SCEI-Async", hatch='\\')
-    axes.bar(range(len(x)), height=data["apfl_y"], yerr=data["apfl_err"], capsize=capsize, width=width, label="APFL", hatch='+')
-    axes.bar([p + width for p in range(len(x))], height=data["fedavg_y"], yerr=data["fedavg_err"], capsize=capsize, width=width, label="FedAvg", hatch='x')
-    axes.bar([(p + width * 2) for p in range(len(x))], height=data["local_y"], yerr=data["local_err"], capsize=capsize, width=width, label="Local", hatch='.')
+    axes.bar([(p - width * 2) for p in range(len(x))], height=data["scei_y"], yerr=data["scei_err"], capsize=capsize, width=width, label="SCEI", alpha=.99, hatch='/')
+    axes.bar([p - width for p in range(len(x))], height=data["sceia_y"], yerr=data["sceia_err"], capsize=capsize, width=width, label="SCEI-Async", alpha=.99, hatch='\\')
+    axes.bar(range(len(x)), height=data["apfl_y"], yerr=data["apfl_err"], capsize=capsize, width=width, label="APFL", alpha=.99, hatch='+')
+    axes.bar([p + width for p in range(len(x))], height=data["fedavg_y"], yerr=data["fedavg_err"], capsize=capsize, width=width, label="FedAvg", alpha=.99, hatch='x')
+    axes.bar([(p + width * 2) for p in range(len(x))], height=data["local_y"], yerr=data["local_err"], capsize=capsize, width=width, label="Local", alpha=.99, hatch='.')
 
     plt.xticks(range(len(x)), x)
     plt.xlabel("Data Skew Level", **font_settings.get("cs_xy_label_font"))
@@ -254,7 +254,7 @@ def plot_skew(title, data, in_legend=False, ex_legend=False, save_path=None, plo
     plt.grid()
     fig.set_size_inches(font_settings.get("fig_width"), font_settings.get("fig_height"))
     if save_path:
-        plt.savefig(save_path, format='eps')
+        plt.savefig(save_path, format='pdf')
     else:
         plt.show()
     if ex_legend:

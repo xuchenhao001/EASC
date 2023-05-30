@@ -15,8 +15,7 @@ def plot_all():
             for file in files:
                 if file.endswith(".py"):
                     python_file_path = os.path.join(path, file)
-                    # output_file_path = os.path.join(plot_subdir, file.rstrip(".py") + ".png")
-                    output_file_path = os.path.join(plot_subdir, file.rstrip(".py") + ".eps")
+                    output_file_path = os.path.join(plot_subdir, file[:-3] + ".pdf")
                     subprocess.call(['python3', python_file_path, "save", output_file_path])
 
 
